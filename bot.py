@@ -3,6 +3,7 @@ import asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from dotenv import load_dotenv
+from aiohttp import web
 
 from database.connection import init_db_pool, close_db_pool
 from database.models import create_tables
@@ -78,6 +79,23 @@ def register_routers(dp: Dispatcher):
     dp.include_router(order.router)
     logger.info("All routers registered.")
 
+async def handle_health(request):
+    """Simple health check endpoint for Render."""
+    return web.Response(text="Bot is running!")
+
+async def start_web_server():
+    """Starts a web server to satisfy Render's health checks for Free Web Services."""
+    app = web.Application()
+    app.router.add_get('/', handle_health)
+    app.router.add_get('/health', handle_health)
+    
+    port = int(os.getenv("PORT", "8080"))
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    logger.info(f"Web server started on port {port} for Render health checks.")
+
 async def main():
     # Register startup and shutdown lifecycle hooks
     dp.startup.register(on_startup)
@@ -85,6 +103,12 @@ async def main():
     
     # Register handlers
     register_routers(dp)
+    
+    # Start web server for Render health checks
+    try:
+        await start_web_server()
+    except Exception as e:
+        logger.error(f"Failed to start web server: {e}")
     
     # Start bot polling (skip accumulated updates on restart)
     logger.info("Starting bot polling...")

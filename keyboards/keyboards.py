@@ -14,13 +14,11 @@ def get_location_keyboard() -> ReplyKeyboardMarkup:
 def get_main_menu_keyboard(is_admin: bool = False) -> ReplyKeyboardMarkup:
     builder = ReplyKeyboardBuilder()
     builder.add(KeyboardButton(text="🛍️ Buyurtma berish"))
-    builder.add(KeyboardButton(text="📋 Mening buyurtmalarim"))
-    builder.add(KeyboardButton(text="👤 Profilim"))
     builder.add(KeyboardButton(text="📞 Bog‘lanish"))
     if is_admin:
         builder.add(KeyboardButton(text="🔑 Admin Panel"))
-    # Grid layout: 2 columns
-    builder.adjust(2)
+    # Clean 1-column layout
+    builder.adjust(1)
     return builder.as_markup(resize_keyboard=True)
 
 def get_products_keyboard(products: list) -> InlineKeyboardMarkup:
