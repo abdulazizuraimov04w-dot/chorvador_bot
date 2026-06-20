@@ -14,7 +14,7 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
 DB_PORT = os.getenv("DB_PORT", "5432")
 DB_NAME = os.getenv("DB_NAME", "dairy_delivery_db")
-DB_SSL = os.getenv("DB_SSL", "require")
+DB_SSL = os.getenv("DB_SSL", "")
 
 # Connection pool instance
 _pool = None
