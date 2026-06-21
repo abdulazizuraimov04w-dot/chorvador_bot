@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chorvador Bot — Web Panel Login</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0b0f19">
+    <link rel="icon" type="image/png" href="/static/icon.png">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card glass">
+            <span class="logo-icon">🧀</span>
+            <h2>Chorvador Admin</h2>
+            <p>Tizimga kirish uchun maxfiy parolni kiriting</p>
+            
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="password">Maxfiy Parol</label>
+                    <input type="password" id="password" class="form-input" placeholder="Parolni kiriting..." required>
+                </div>
+                <button type="submit" class="btn">Kirish</button>
+                <div id="errorMsg" class="error-msg"></div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Redirect to dashboard if token exists
+        if (localStorage.getItem("admin_token")) {
+            window.location.href = "/";
+        }
+
+        document.getElementById("loginForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const password = document.getElementById("password").value;
+            const errorMsg = document.getElementById("errorMsg");
+            errorMsg.style.display = "none";
+
+            try {
+                const response = await fetch("/api/login", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.token) {
+                    localStorage.setItem("admin_token", data.token);
+                    window.location.href = "/";
+                } else {
+                    errorMsg.textContent = data.error || "Parol xato!";
+                    errorMsg.style.display = "block";
+                }
+            } catch (err) {
+                errorMsg.textContent = "Server bilan ulanishda xatolik!";
+                errorMsg.style.display = "block";
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chorvador Bot — Boshqaruv Paneli</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0b0f19">
+    <link rel="icon" type="image/png" href="/static/icon.png">
+    <!-- Chart.js for analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="dashboard-wrapper">
+        <header class="glass">
+            <div class="brand">
+                <span class="brand-logo">🧀</span>
+                <h1>Chorvador Admin</h1>
+            </div>
+            <button id="logoutBtn" class="logout-btn">Chiqish</button>
+        </header>
+
+        <main>
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card glass">
+                    <div class="stat-info">
+                        <p>Jami Mijozlar</p>
+                        <span id="totalCustomers" class="stat-value">0</span>
+                    </div>
+                    <span class="stat-icon">👥</span>
+                </div>
+                <div class="stat-card glass">
+                    <div class="stat-info">
+                        <p>Jami Buyurtmalar</p>
+                        <span id="totalOrders" class="stat-value">0</span>
+                    </div>
+                    <span class="stat-icon">📦</span>
+                </div>
+                <div class="stat-card glass">
+                    <div class="stat-info">
+                        <p>Umumiy Tushum</p>
+                        <span id="totalRevenue" class="stat-value">0 so'm</span>
+                    </div>
+                    <span class="stat-icon">💵</span>
+                </div>
+            </div>
+
+            <!-- Charts Grid -->
+            <div class="charts-grid">
+                <div class="chart-card glass">
+                    <h3>Oxirgi 7 kunlik savdo tahlili</h3>
+                    <div style="position: relative; height:250px; width:100%">
+                        <canvas id="salesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Real-time Orders Section -->
+            <div class="orders-section">
+                <h2>🔔 Real-time Buyurtmalar</h2>
+                <div id="ordersList" class="orders-list">
+                    <div class="empty-state glass">
+                        <div class="empty-icon">⏳</div>
+                        <p>Buyurtmalar yuklanmoqda...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- PWA Installation Toast / Notification can go here if needed -->
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
