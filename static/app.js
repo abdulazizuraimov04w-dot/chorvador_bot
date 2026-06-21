@@ -1,7 +1,7 @@
 // Check authentication on load
 const token = localStorage.getItem("admin_token");
 if (!token) {
-    window.location.href = "/login";
+    window.location.href = "/chorvador-panel/login";
 }
 
 // Config
@@ -19,7 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Setup Logout
     document.getElementById("logoutBtn").addEventListener("click", () => {
         localStorage.removeItem("admin_token");
-        window.location.href = "/login";
+        window.location.href = "/chorvador-panel/login";
     });
 
     // Initial Fetch
@@ -43,7 +43,7 @@ async function fetchDashboardData() {
         // If unauthorized, redirect to login
         if (err.status === 401) {
             localStorage.removeItem("admin_token");
-            window.location.href = "/login";
+            window.location.href = "/chorvador-panel/login";
         }
     }
 }

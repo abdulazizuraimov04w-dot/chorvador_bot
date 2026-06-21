@@ -1,7 +1,7 @@
 const CACHE_NAME = 'chorvador-admin-cache-v1';
 const ASSETS_TO_CACHE = [
-  '/',
-  '/login',
+  '/chorvador-panel',
+  '/chorvador-panel/login',
   '/static/style.css',
   '/static/app.js',
   '/static/icon.png',

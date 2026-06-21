@@ -30,7 +30,7 @@
     <script>
         // Redirect to dashboard if token exists
         if (localStorage.getItem("admin_token")) {
-            window.location.href = "/";
+            window.location.href = "/chorvador-panel";
         }
 
         document.getElementById("loginForm").addEventListener("submit", async (e) => {
@@ -52,7 +52,7 @@
 
                 if (response.ok && data.token) {
                     localStorage.setItem("admin_token", data.token);
-                    window.location.href = "/";
+                    window.location.href = "/chorvador-panel";
                 } else {
                     errorMsg.textContent = data.error || "Parol xato!";
                     errorMsg.style.display = "block";
