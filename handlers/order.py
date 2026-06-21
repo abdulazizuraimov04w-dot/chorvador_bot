@@ -241,9 +241,46 @@ async def confirm_order(callback: CallbackQuery, state: FSMContext):
         )
         
         # Send notification to admins
-        # We will implement this if bot and admins are loaded. Let's do it inside main entry point or here.
-        # It is very professional to notify all admins about new orders!
-        # We will handle it by importing bot or dispatching it. Let's log it for now.
+        import os
+        from dotenv import load_dotenv
+        load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env'))
+        try:
+            admin_ids = [int(x.strip()) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip().isdigit()]
+        except Exception:
+            admin_ids = []
+            
+        # Also select all admin users from DB
+        try:
+            db_users = await models.get_all_users()
+            for u in db_users:
+                if u.get("is_admin", False) and u['telegram_id'] not in admin_ids:
+                    admin_ids.append(u['telegram_id'])
+        except Exception as db_err:
+            logger.error(f"Failed to fetch db admins for order notification: {db_err}")
+            
+        # Format products list for notification
+        items_text = ""
+        for item in cart:
+            qty_unit = "dona" if item['name'] == "Malako" else "kg"
+            items_text += f"  - {item['name']}: {item['quantity']} {qty_unit}\n"
+            
+        admin_text = (
+            f"🔔 **YANGI BUYURTMA KELIB TUSHDI!**\n\n"
+            f"**Buyurtma raqami:** #{order_id}\n"
+            f"**Mijoz:** {user['full_name']}\n"
+            f"**Telefon:** {user['phone_number']}\n"
+            f"**Yetkazish vaqti:** 06:30 - 07:30 (Ertaga)\n\n"
+            f"**Mahsulotlar:**\n{items_text}\n"
+            f"💵 **Jami summa:** {int(total_price):,} so'm\n\n".replace(",", " ") +
+            f"*Batafsil ma'lumot va boshqarish uchun Web Panelga kiring!*"
+        )
+        
+        for admin_id in admin_ids:
+            try:
+                await callback.bot.send_message(chat_id=admin_id, text=admin_text, parse_mode="Markdown")
+                logger.info(f"New order notification sent to admin {admin_id}")
+            except Exception as notify_err:
+                logger.error(f"Failed to send order notification to admin {admin_id}: {notify_err}")
         
     except Exception as e:
         logger.error(f"Failed to confirm order for user {telegram_id}: {e}")
