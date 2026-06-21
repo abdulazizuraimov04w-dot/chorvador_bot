@@ -230,6 +230,7 @@ async def get_all_orders(limit: int = 50) -> List[Dict[str, Any]]:
     query = """
         SELECT o.id as order_id, o.status, o.total_price, o.delivery_date, o.delivery_time_start, 
                o.delivery_time_end, o.created_at, u.full_name, u.phone_number, u.telegram_id,
+               u.latitude, u.longitude,
                array_to_json(array_agg(json_build_object(
                    'product_name', p.name,
                    'quantity', oi.quantity,
@@ -301,3 +302,84 @@ async def get_daily_sales_report(date: datetime.date) -> Dict[str, Any]:
         "order_count": row["order_count"] if row else 0,
         "items": [dict(r) for r in rows_items]
     }
+
+async def get_dashboard_stats() -> Dict[str, Any]:
+    """Retrieves analytical statistics for the web admin dashboard."""
+    # 1. Total customers
+    total_customers = await fetch_val("SELECT COUNT(*) FROM users;")
+    
+    # 2. Total orders
+    total_orders = await fetch_val("SELECT COUNT(*) FROM orders;")
+    
+    # 3. Total revenue
+    total_revenue = await fetch_val("SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE status IN ('confirmed', 'completed');")
+    
+    # 4. Chart data: last 7 days sales and orders
+    chart_query = """
+        SELECT 
+            d.date::date as sale_date,
+            COALESCE(SUM(o.total_price), 0) as daily_revenue,
+            COUNT(o.id) as daily_orders
+        FROM generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, '1 day'::interval) d(date)
+        LEFT JOIN orders o ON o.delivery_date = d.date::date AND o.status IN ('confirmed', 'completed')
+        GROUP BY d.date
+        ORDER BY d.date ASC;
+    """
+    chart_rows = await fetch_rows(chart_query)
+    
+    # Map chart rows into list of dicts with formatted dates
+    chart_data = []
+    for r in chart_rows:
+        chart_data.append({
+            "date": r["sale_date"].strftime("%d.%m"),
+            "revenue": float(r["daily_revenue"]),
+            "orders": r["daily_orders"]
+        })
+        
+    return {
+        "total_customers": total_customers,
+        "total_orders": total_orders,
+        "total_revenue": float(total_revenue),
+        "chart_data": chart_data
+    }
+
+async def get_dashboard_orders() -> List[Dict[str, Any]]:
+    """Retrieves all orders with user and items details, sorted for dashboard viewing."""
+    query = """
+        SELECT o.id as order_id, o.status, o.total_price, o.delivery_date, o.delivery_time_start, 
+               o.delivery_time_end, o.created_at, u.full_name, u.phone_number, u.telegram_id,
+               u.latitude, u.longitude,
+               array_to_json(array_agg(json_build_object(
+                   'product_name', p.name,
+                   'quantity', oi.quantity,
+                   'price', oi.price_at_purchase
+               ))) as items
+        FROM orders o
+        JOIN users u ON o.user_id = u.id
+        LEFT JOIN order_items oi ON o.id = oi.order_id
+        LEFT JOIN products p ON oi.product_id = p.id
+        GROUP BY o.id, u.id
+        ORDER BY 
+            CASE 
+                WHEN o.status = 'pending' THEN 1
+                WHEN o.status = 'confirmed' THEN 2
+                WHEN o.status = 'completed' THEN 3
+                ELSE 4
+            END ASC,
+            o.created_at DESC;
+    """
+    rows = await fetch_rows(query)
+    result = []
+    for r in rows:
+        order_dict = dict(r)
+        import json
+        if isinstance(order_dict['items'], str):
+            order_dict['items'] = json.loads(order_dict['items'])
+        
+        # Format datetimes/decimals for JSON serialization
+        order_dict['delivery_date'] = order_dict['delivery_date'].strftime("%Y-%m-%d")
+        order_dict['created_at'] = order_dict['created_at'].strftime("%H:%M | %d.%m.%Y")
+        order_dict['total_price'] = float(order_dict['total_price'])
+        
+        result.append(order_dict)
+    return result
