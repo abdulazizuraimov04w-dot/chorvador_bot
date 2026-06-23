@@ -14,3 +14,5 @@ __pycache__/
 # IDE files
 .vscode/
 .idea/
+.tmp.driveupload/
+*.tmp

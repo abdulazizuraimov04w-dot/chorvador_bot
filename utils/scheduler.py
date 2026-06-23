@@ -17,13 +17,13 @@ except Exception as e:
     logger.error(f"Error parsing ADMIN_IDS in scheduler: {e}")
     ADMIN_IDS = []
 
-# Config: report trigger hour and minute (e.g. 06:00 AM)
+# Config: report trigger hour and minute (Uzbekistan time - 06:00 AM)
 REPORT_HOUR = 6
 REPORT_MINUTE = 0
 
-# Config: customer breakfast alert hour and minute (5:30 AM)
-CUSTOMER_ALERT_HOUR = 5
-CUSTOMER_ALERT_MINUTE = 30
+# Config: customer breakfast alert hour and minute (Uzbekistan time - 06:00 AM)
+CUSTOMER_ALERT_HOUR = 6
+CUSTOMER_ALERT_MINUTE = 0
 
 async def send_breakfast_reminder_to_customers(bot: Bot):
     """Sends a daily breakfast order reminder message with product buttons to all registered customers."""
