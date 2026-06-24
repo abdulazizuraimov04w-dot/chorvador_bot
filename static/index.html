@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Chorvador Panel</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
 :root {
   --bg: #0f1117;
@@ -226,7 +228,40 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
 .add-btn { display:flex; align-items:center; gap:6px; padding:9px 16px; background:var(--accent); color:#fff; border:none; border-radius:9px; font-size:13px; font-weight:600; cursor:pointer; transition:.15s; }
 .add-btn:hover { opacity:.88; }
 
-/* RESPONSIVE */
+/* MAP PAGE */
+.map-page { display:flex; gap:0; height:calc(100vh - 57px); margin:-24px; overflow:hidden; }
+.map-sidebar { width:320px; flex-shrink:0; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
+.map-sidebar-header { padding:16px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.map-date-selector { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.map-date-input { flex:1; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; outline:none; }
+.map-date-input:focus { border-color:var(--accent); }
+.map-refresh-btn { padding:8px 12px; background:var(--accent); color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; }
+.map-stats-row { display:flex; gap:8px; }
+.map-stat { flex:1; background:var(--surface2); border-radius:8px; padding:8px 10px; text-align:center; }
+.map-stat-val { font-size:18px; font-weight:700; }
+.map-stat-label { font-size:10px; color:var(--muted); }
+.map-orders-list { flex:1; overflow-y:auto; padding:8px; }
+.map-order-item { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:8px; cursor:pointer; transition:.15s; }
+.map-order-item:hover, .map-order-item.selected { border-color:var(--accent); background:rgba(79,142,247,.08); }
+.map-order-item.done { opacity:.5; }
+.map-order-num { font-size:11px; color:var(--muted); margin-bottom:2px; }
+.map-order-name { font-size:14px; font-weight:600; }
+.map-order-items { font-size:11px; color:var(--muted); margin-top:3px; }
+.map-order-price { font-size:13px; font-weight:700; color:var(--accent); margin-top:4px; }
+.map-order-actions { display:flex; gap:6px; margin-top:8px; }
+.map-action-btn { flex:1; padding:6px; border-radius:7px; border:none; font-size:11px; font-weight:600; cursor:pointer; transition:.15s; }
+.map-action-arrived { background:rgba(245,158,11,.15); color:var(--yellow); }
+.map-action-done { background:rgba(34,197,94,.15); color:var(--green); }
+.map-action-arrived:hover { background:rgba(245,158,11,.3); }
+.map-action-done:hover { background:rgba(34,197,94,.3); }
+#delivery-map { flex:1; z-index:1; }
+.leaflet-popup-content-wrapper { background:var(--surface) !important; color:var(--text) !important; border:1px solid var(--border) !important; border-radius:10px !important; box-shadow:var(--shadow) !important; }
+.leaflet-popup-tip { background:var(--surface) !important; }
+.map-popup-title { font-size:14px; font-weight:700; margin-bottom:6px; }
+.map-popup-info { font-size:12px; color:var(--muted); margin-bottom:3px; }
+.map-popup-price { font-size:13px; font-weight:700; color:#4f8ef7; margin-top:6px; }
+.map-popup-btn { display:inline-block; margin-top:8px; padding:5px 12px; background:#4f8ef7; color:#fff; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; width:100%; text-align:center; }
+
 @media(max-width:768px) {
   .sidebar { width:200px; }
   .stats-grid { grid-template-columns:repeat(2,1fr); }
@@ -274,6 +309,7 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
       <button class="nav-item" onclick="navigate('customers',this)"><span class="icon">👥</span> Mijozlar</button>
       <button class="nav-item" onclick="navigate('broadcast',this)"><span class="icon">📢</span> Xabar yuborish</button>
       <button class="nav-item" onclick="navigate('payments',this)"><span class="icon">💰</span> To'lovlar</button>
+      <button class="nav-item" onclick="navigate('map',this)"><span class="icon">🗺️</span> Yetkazish xaritasi</button>
     </nav>
     <div class="sidebar-footer">
       <div style="font-size:11px;color:var(--muted);text-align:center;" id="sidebar-time">--:--</div>
@@ -410,6 +446,29 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
         </div>
       </div>
 
+      <!-- MAP -->
+      <div class="page" id="page-map">
+        <div class="map-page">
+          <div class="map-sidebar">
+            <div class="map-sidebar-header">
+              <div class="map-date-selector">
+                <input type="date" id="map-date" class="map-date-input">
+                <button class="map-refresh-btn" onclick="loadMapOrders()">🔄</button>
+              </div>
+              <div class="map-stats-row">
+                <div class="map-stat"><div class="map-stat-val" id="map-total">0</div><div class="map-stat-label">Jami</div></div>
+                <div class="map-stat"><div class="map-stat-val" id="map-done" style="color:var(--green)">0</div><div class="map-stat-label">Yetkazildi</div></div>
+                <div class="map-stat"><div class="map-stat-val" id="map-left" style="color:var(--yellow)">0</div><div class="map-stat-label">Qoldi</div></div>
+              </div>
+            </div>
+            <div class="map-orders-list" id="map-orders-list">
+              <div class="loader"><div class="spinner"></div></div>
+            </div>
+          </div>
+          <div id="delivery-map"></div>
+        </div>
+      </div>
+
     </div><!-- /content -->
   </div><!-- /main -->
 </div><!-- /app -->
@@ -463,6 +522,10 @@ let currentChartMode = 'revenue';
 let currentOrderId = null;
 let currentFilter = 'all';
 let editingProductId = null;
+let mapInstance = null;
+let mapMarkers = [];
+let mapOrders = [];
+let selectedMapOrderId = null;
 
 // ==================== AUTH ====================
 function savedToken() { try { return sessionStorage.getItem('cp_token') || ''; } catch { return ''; } }
@@ -528,13 +591,14 @@ function navigate(page, btn) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   if (btn) btn.classList.add('active');
   document.getElementById('page-' + page).classList.add('active');
-  const titles = { dashboard:'Statistika', orders:'Buyurtmalar', products:'Mahsulotlar', customers:'Mijozlar', broadcast:'Xabar yuborish', payments:'To\'lovlar' };
+  const titles = { dashboard:'Statistika', orders:'Buyurtmalar', products:'Mahsulotlar', customers:'Mijozlar', broadcast:'Xabar yuborish', payments:'To\'lovlar', map:'🗺️ Yetkazish xaritasi' };
   document.getElementById('page-title').textContent = titles[page] || page;
   if (page === 'orders') loadOrders();
   if (page === 'products') loadProducts();
   if (page === 'customers') loadCustomers();
   if (page === 'broadcast') loadBroadcastInfo();
   if (page === 'payments') loadPayments();
+  if (page === 'map') initMap();
 }
 
 // ==================== DASHBOARD ====================
@@ -959,6 +1023,162 @@ function toggleTheme() {
   document.querySelector('.theme-btn').textContent = isDark ? '🌙' : '☀️';
   // Re-render chart for color update
   if (chartData) setTimeout(() => renderChart(chartData), 100);
+}
+
+// ==================== MAP ====================
+
+function initMap() {
+  // Set today's date by default
+  const today = new Date().toISOString().split('T')[0];
+  if (!document.getElementById('map-date').value) {
+    document.getElementById('map-date').value = today;
+  }
+
+  // Init Leaflet map once
+  if (!mapInstance) {
+    mapInstance = L.map('delivery-map').setView([41.2995, 69.2401], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap'
+    }).addTo(mapInstance);
+  }
+
+  loadMapOrders();
+}
+
+async function loadMapOrders() {
+  const date = document.getElementById('map-date').value;
+  document.getElementById('map-orders-list').innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+
+  const orders = await api('/api/orders');
+  if (!orders) return;
+
+  // Filter: only selected date + not cancelled + has location
+  mapOrders = orders.filter(o => {
+    if (o.status === 'cancelled') return false;
+    if (o.delivery_date !== date) return false;
+    if (!o.latitude || !o.longitude) return false;
+    return true;
+  });
+
+  // Update stats
+  const done = mapOrders.filter(o => o.status === 'completed').length;
+  document.getElementById('map-total').textContent = mapOrders.length;
+  document.getElementById('map-done').textContent = done;
+  document.getElementById('map-left').textContent = mapOrders.length - done;
+
+  renderMapSidebar();
+  renderMapMarkers();
+}
+
+function renderMapSidebar() {
+  const list = document.getElementById('map-orders-list');
+  if (!mapOrders.length) {
+    list.innerHTML = '<div class="empty-state"><div class="emoji">📦</div><p>Bu sana buyurtma yo\'q</p></div>';
+    return;
+  }
+
+  // Sort: pending/confirmed first, completed last
+  const sorted = [...mapOrders].sort((a, b) => {
+    const order = { confirmed:0, pending:1, completed:2 };
+    return (order[a.status]||1) - (order[b.status]||1);
+  });
+
+  list.innerHTML = sorted.map(o => {
+    const items = (o.items||[]).filter(i=>i.product_name).map(i=>`${i.product_name} × ${i.quantity}`).join(', ');
+    const isDone = o.status === 'completed';
+    return `
+      <div class="map-order-item ${isDone?'done':''} ${selectedMapOrderId===o.order_id?'selected':''}"
+           id="mapitem-${o.order_id}"
+           onclick="selectMapOrder(${o.order_id})">
+        <div class="map-order-num">#${o.order_id} · ${statusBadge(o.status)}</div>
+        <div class="map-order-name">${esc(o.full_name||'')}</div>
+        <div class="map-order-items">${items||'—'}</div>
+        <div class="map-order-price">${fmtMoney(o.total_price)}</div>
+        ${!isDone ? `
+        <div class="map-order-actions">
+          <button class="map-action-btn map-action-arrived" onclick="event.stopPropagation();mapNotifyArrived(${o.order_id})">🔔 Yetdim</button>
+          <button class="map-action-btn map-action-done" onclick="event.stopPropagation();mapMarkDone(${o.order_id})">✅ Yetkazildi</button>
+        </div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function renderMapMarkers() {
+  // Clear old markers
+  mapMarkers.forEach(m => m.remove());
+  mapMarkers = [];
+
+  if (!mapOrders.length) return;
+
+  const bounds = [];
+
+  mapOrders.forEach(o => {
+    const isDone = o.status === 'completed';
+    const items = (o.items||[]).filter(i=>i.product_name).map(i=>`${i.product_name} × ${i.quantity}`).join('<br>');
+
+    // Custom colored marker
+    const color = isDone ? '#22c55e' : (o.status === 'pending' ? '#f59e0b' : '#4f8ef7');
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="
+        width:32px;height:32px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);
+        background:${color};border:2px solid white;
+        box-shadow:0 2px 8px rgba(0,0,0,0.4);
+        display:flex;align-items:center;justify-content:center;
+      "><span style="transform:rotate(45deg);font-size:13px;">${isDone?'✓':'📦'}</span></div>`,
+      iconSize: [32, 32],
+      iconAnchor: [16, 32],
+      popupAnchor: [0, -34]
+    });
+
+    const marker = L.marker([o.latitude, o.longitude], { icon })
+      .addTo(mapInstance)
+      .bindPopup(`
+        <div class="map-popup-title">#${o.order_id} — ${esc(o.full_name||'')}</div>
+        <div class="map-popup-info">📞 ${o.phone_number||''}</div>
+        <div class="map-popup-info">${items||'—'}</div>
+        <div class="map-popup-price">${fmtMoney(o.total_price)}</div>
+        ${!isDone ? `<button class="map-popup-btn" onclick="mapMarkDone(${o.order_id})">✅ Yetkazildi</button>` : '<div style="color:#22c55e;font-weight:700;margin-top:6px;">✓ Yetkazilgan</div>'}
+      `);
+
+    marker.on('click', () => selectMapOrder(o.order_id));
+    mapMarkers.push(marker);
+    bounds.push([o.latitude, o.longitude]);
+  });
+
+  // Fit map to show all markers
+  if (bounds.length) {
+    mapInstance.fitBounds(bounds, { padding: [40, 40] });
+  }
+}
+
+function selectMapOrder(id) {
+  selectedMapOrderId = id;
+  // Highlight sidebar item
+  document.querySelectorAll('.map-order-item').forEach(el => el.classList.remove('selected'));
+  const el = document.getElementById('mapitem-' + id);
+  if (el) { el.classList.add('selected'); el.scrollIntoView({ behavior:'smooth', block:'nearest' }); }
+
+  // Open marker popup
+  const order = mapOrders.find(o => o.order_id === id);
+  if (!order) return;
+  const idx = mapOrders.indexOf(order);
+  if (mapMarkers[idx]) mapMarkers[idx].openPopup();
+}
+
+async function mapNotifyArrived(orderId) {
+  const r = await api(`/api/orders/${orderId}/arrived`, 'POST');
+  if (r?.success) showToast('Mijozga "Yetdim" xabari yuborildi!', 'success');
+  else showToast('Xatolik', 'error');
+}
+
+async function mapMarkDone(orderId) {
+  const r = await api(`/api/orders/${orderId}/status`, 'POST', { status: 'completed' });
+  if (r?.success) {
+    showToast(`#${orderId} yetkazildi!`, 'success');
+    await loadMapOrders();
+  } else showToast('Xatolik', 'error');
 }
 
 // ==================== AUTO LOGIN (if token saved) ====================
