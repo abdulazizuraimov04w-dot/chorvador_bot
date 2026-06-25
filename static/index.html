@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="uz" data-theme="dark">
+<html lang="uz" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -262,14 +262,46 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
 .map-popup-price { font-size:13px; font-weight:700; color:#4f8ef7; margin-top:6px; }
 .map-popup-btn { display:inline-block; margin-top:8px; padding:5px 12px; background:#4f8ef7; color:#fff; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; width:100%; text-align:center; }
 
+.miniapp-editor { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.miniapp-section { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px; }
+.miniapp-section-title { font-size:14px; font-weight:700; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+.miniapp-product-row { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); }
+.miniapp-product-row:last-child { border-bottom:none; }
+.miniapp-product-name { flex:1; font-size:14px; font-weight:600; }
+.miniapp-product-price { font-size:13px; color:var(--accent); font-weight:700; min-width:100px; }
+.miniapp-settings-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--border); font-size:13px; }
+.miniapp-settings-row:last-child { border-bottom:none; }
+.miniapp-input { background:var(--surface2); border:1px solid var(--border); border-radius:7px; padding:6px 10px; color:var(--text); font-size:13px; outline:none; width:160px; }
+.miniapp-input:focus { border-color:var(--accent); }
+.miniapp-save-btn { width:100%; margin-top:14px; padding:11px; background:var(--accent); color:#fff; border:none; border-radius:9px; font-size:14px; font-weight:700; cursor:pointer; }
+.miniapp-save-btn:hover { opacity:.88; }
+.mobile-nav { display:none; position:fixed; bottom:0; left:0; right:0; background:var(--surface); border-top:1px solid var(--border); z-index:200; }
+.mobile-nav-inner { display:flex; }
+.mobile-nav-item { flex:1; display:flex; flex-direction:column; align-items:center; padding:10px 0; cursor:pointer; border:none; background:none; color:var(--muted); font-size:9px; font-weight:500; gap:2px; }
+.mobile-nav-item.active { color:var(--accent); }
+.mobile-nav-item .micon { font-size:20px; }
 @media(max-width:768px) {
   .sidebar { width:200px; }
   .stats-grid { grid-template-columns:repeat(2,1fr); }
   .content { padding:16px; }
+  .miniapp-editor { grid-template-columns:1fr; }
 }
-@media(max-width:560px) {
+@media(max-width:600px) {
   .sidebar { display:none; }
-  .stats-grid { grid-template-columns:1fr 1fr; }
+  .mobile-nav { display:block; }
+  .app { height:auto; overflow:auto; }
+  .main { overflow:visible; }
+  .content { padding:12px; padding-bottom:80px; }
+  .topbar { padding:12px 16px; }
+  .stats-grid { grid-template-columns:1fr 1fr; gap:10px; }
+  .stat-value { font-size:20px; }
+  .table-header { flex-direction:column; align-items:stretch; gap:8px; }
+  .search-box { max-width:100%; }
+  .filter-row { flex-wrap:wrap; }
+  .map-page { flex-direction:column; height:auto; margin:0 -12px; }
+  .map-sidebar { width:100%; max-height:300px; }
+  #delivery-map { height:400px; }
+  .miniapp-editor { grid-template-columns:1fr; }
 }
 </style>
 </head>
@@ -310,6 +342,7 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
       <button class="nav-item" onclick="navigate('broadcast',this)"><span class="icon">📢</span> Xabar yuborish</button>
       <button class="nav-item" onclick="navigate('payments',this)"><span class="icon">💰</span> To'lovlar</button>
       <button class="nav-item" onclick="navigate('map',this)"><span class="icon">🗺️</span> Yetkazish xaritasi</button>
+      <button class="nav-item" onclick="navigate('miniapp',this)"><span class="icon">📱</span> Mini App</button>
     </nav>
     <div class="sidebar-footer">
       <div style="font-size:11px;color:var(--muted);text-align:center;" id="sidebar-time">--:--</div>
@@ -469,8 +502,64 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
         </div>
       </div>
 
+      <!-- MINIAPP EDITOR -->
+      <div class="page" id="page-miniapp">
+        <div class="miniapp-editor">
+          <div class="miniapp-section">
+            <div class="miniapp-section-title">🧀 Mahsulotlar (narx va holat)</div>
+            <div id="miniapp-products-list"><div class="loader"><div class="spinner"></div></div></div>
+          </div>
+          <div class="miniapp-section">
+            <div class="miniapp-section-title">⚙️ Sozlamalar</div>
+            <div class="miniapp-settings-row">
+              <span>📞 Bog'lanish raqami</span>
+              <input type="text" class="miniapp-input" id="ma-phone" placeholder="+998901234567">
+            </div>
+            <div class="miniapp-settings-row">
+              <span>🌅 Ertalab vaqti</span>
+              <div style="display:flex;gap:4px">
+                <input type="time" class="miniapp-input" id="ma-t1-start" value="06:00" style="width:80px">
+                <input type="time" class="miniapp-input" id="ma-t1-end" value="07:00" style="width:80px">
+              </div>
+            </div>
+            <div class="miniapp-settings-row">
+              <span>☀️ Kunduz vaqti</span>
+              <div style="display:flex;gap:4px">
+                <input type="time" class="miniapp-input" id="ma-t2-start" value="12:00" style="width:80px">
+                <input type="time" class="miniapp-input" id="ma-t2-end" value="13:00" style="width:80px">
+              </div>
+            </div>
+            <div class="miniapp-settings-row">
+              <span>🌆 Kechqurun vaqti</span>
+              <div style="display:flex;gap:4px">
+                <input type="time" class="miniapp-input" id="ma-t3-start" value="18:00" style="width:80px">
+                <input type="time" class="miniapp-input" id="ma-t3-end" value="19:00" style="width:80px">
+              </div>
+            </div>
+            <div class="miniapp-settings-row">
+              <span>🗓️ Bugungi buyurtma</span>
+              <label class="toggle-switch"><input type="checkbox" id="ma-today" checked><span class="toggle-slider"></span></label>
+            </div>
+            <div class="miniapp-settings-row">
+              <span>🗓️ Ertangi buyurtma</span>
+              <label class="toggle-switch"><input type="checkbox" id="ma-tomorrow" checked><span class="toggle-slider"></span></label>
+            </div>
+            <button class="miniapp-save-btn" onclick="saveMiniappSettings()">💾 Saqlash</button>
+          </div>
+        </div>
+      </div>
+
     </div><!-- /content -->
   </div><!-- /main -->
+<div class="mobile-nav">
+  <div class="mobile-nav-inner">
+    <button class="mobile-nav-item active" id="mnav-dashboard" onclick="navigate('dashboard',null);mobileNav('dashboard')"><span class="micon">📊</span>Statistika</button>
+    <button class="mobile-nav-item" id="mnav-orders" onclick="navigate('orders',null);mobileNav('orders')" style="position:relative"><span class="micon">📦</span>Buyurtmalar<span class="mobile-nav-badge" id="mnav-badge" style="display:none">0</span></button>
+    <button class="mobile-nav-item" id="mnav-map" onclick="navigate('map',null);mobileNav('map')"><span class="micon">🗺️</span>Xarita</button>
+    <button class="mobile-nav-item" id="mnav-miniapp" onclick="navigate('miniapp',null);mobileNav('miniapp')"><span class="micon">📱</span>Mini App</button>
+    <button class="mobile-nav-item" id="mnav-payments" onclick="navigate('payments',null);mobileNav('payments')"><span class="micon">💰</span>To'lovlar</button>
+  </div>
+</div>
 </div><!-- /app -->
 
 <!-- ORDER DETAIL MODAL -->
@@ -591,7 +680,7 @@ function navigate(page, btn) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   if (btn) btn.classList.add('active');
   document.getElementById('page-' + page).classList.add('active');
-  const titles = { dashboard:'Statistika', orders:'Buyurtmalar', products:'Mahsulotlar', customers:'Mijozlar', broadcast:'Xabar yuborish', payments:'To\'lovlar', map:'🗺️ Yetkazish xaritasi' };
+  const titles = { dashboard:'Statistika', orders:'Buyurtmalar', products:'Mahsulotlar', customers:'Mijozlar', broadcast:'Xabar yuborish', payments:'To\'lovlar', map:'🗺️ Yetkazish xaritasi', miniapp:'📱 Mini App' };
   document.getElementById('page-title').textContent = titles[page] || page;
   if (page === 'orders') loadOrders();
   if (page === 'products') loadProducts();
@@ -599,6 +688,7 @@ function navigate(page, btn) {
   if (page === 'broadcast') loadBroadcastInfo();
   if (page === 'payments') loadPayments();
   if (page === 'map') initMap();
+  if (page === 'miniapp') loadMiniappEditor();
 }
 
 // ==================== DASHBOARD ====================
@@ -1020,7 +1110,7 @@ function toggleTheme() {
   const html = document.documentElement;
   const isDark = html.getAttribute('data-theme') === 'dark';
   html.setAttribute('data-theme', isDark ? 'light' : 'dark');
-  document.querySelector('.theme-btn').textContent = isDark ? '🌙' : '☀️';
+  document.querySelector('.theme-btn').textContent = isDark ? '🌙' : '☀️'; document.querySelector('.theme-btn').title = isDark ? 'Qorong\'i rejim' : 'Kunduz rejim';
   // Re-render chart for color update
   if (chartData) setTimeout(() => renderChart(chartData), 100);
 }
@@ -1179,6 +1269,55 @@ async function mapMarkDone(orderId) {
     showToast(`#${orderId} yetkazildi!`, 'success');
     await loadMapOrders();
   } else showToast('Xatolik', 'error');
+}
+
+// ==================== MOBILE NAV ====================
+function mobileNav(page) {
+  document.querySelectorAll('.mobile-nav-item').forEach(b => b.classList.remove('active'));
+  const el = document.getElementById('mnav-' + page);
+  if (el) el.classList.add('active');
+}
+
+// Update mobile badge
+const origUpdateBadge = updatePendingBadge;
+function updatePendingBadge() {
+  const cnt = allOrders.filter(o => o.status === 'pending').length;
+  const badge = document.getElementById('pending-badge');
+  if (badge) { badge.style.display = cnt > 0 ? '' : 'none'; badge.textContent = cnt; }
+  const mbadge = document.getElementById('mnav-badge');
+  if (mbadge) { mbadge.style.display = cnt > 0 ? '' : 'none'; mbadge.textContent = cnt; }
+}
+
+// ==================== MINIAPP EDITOR ====================
+async function loadMiniappEditor() {
+  const data = await api('/api/products');
+  if (!data) return;
+  const list = document.getElementById('miniapp-products-list');
+  list.innerHTML = data.map(p => `
+    <div class="miniapp-product-row">
+      <div class="miniapp-product-name">${esc(p.name)}</div>
+      <input type="number" class="miniapp-input" value="${p.price}" id="ma-price-${p.id}" style="width:100px">
+      <label class="toggle-switch" style="margin-left:6px">
+        <input type="checkbox" ${p.is_active?'checked':''} onchange="toggleProduct(${p.id},this.checked)">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+  `).join('');
+}
+
+async function saveMiniappSettings() {
+  // Save product prices
+  const data = await api('/api/products');
+  if (data) {
+    for (const p of data) {
+      const inp = document.getElementById('ma-price-' + p.id);
+      if (inp && parseFloat(inp.value) !== p.price) {
+        await api('/api/products/' + p.id, 'PUT', { name: p.name, price: parseFloat(inp.value) });
+      }
+    }
+  }
+  showToast('Saqlandi!', 'success');
+  loadMiniappEditor();
 }
 
 // ==================== AUTO LOGIN (if token saved) ====================

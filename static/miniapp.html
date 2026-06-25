@@ -47,7 +47,6 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .catalog-header p { font-size:13px; color:var(--muted); margin-top:2px; }
 .products-list { padding:0 16px; display:flex; flex-direction:column; gap:12px; }
 .product-card { background:var(--surface); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); display:flex; align-items:center; gap:14px; }
-.product-emoji { font-size:40px; flex-shrink:0; }
 .product-info { flex:1; }
 .product-name { font-size:15px; font-weight:700; }
 .product-price { font-size:16px; font-weight:800; color:var(--accent); margin-top:2px; }
@@ -362,7 +361,7 @@ function renderProducts() {
   if (!products.length) { list.innerHTML = '<div class="loader">Mahsulotlar yo\'q</div>'; return; }
   list.innerHTML = products.map(p => `
     <div class="product-card">
-      <div class="product-emoji">${getEmoji(p.name)}</div>
+      
       <div class="product-info">
         <div class="product-name">${esc(p.name)}</div>
         <div class="product-price">${fmtPrice(p.price)} <small>so'm</small></div>

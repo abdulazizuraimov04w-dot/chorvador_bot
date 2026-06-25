@@ -14,12 +14,9 @@ def get_location_keyboard() -> ReplyKeyboardMarkup:
 def get_main_menu_keyboard(is_admin: bool = False) -> ReplyKeyboardMarkup:
     builder = ReplyKeyboardBuilder()
     if is_admin:
-        # Admin faqat admin tugmalarini ko'radi
         builder.add(KeyboardButton(text="🔑 Admin Panel"))
     else:
-        # Oddiy mijoz menyusi
         builder.add(KeyboardButton(text="🛒 Buyurtma berish"))
-        builder.add(KeyboardButton(text="📋 Mening buyurtmalarim"))
         builder.add(KeyboardButton(text="👤 Profilim"))
         builder.add(KeyboardButton(text="📞 Bog'lanish"))
     builder.adjust(1)
