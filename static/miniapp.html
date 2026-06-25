@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Sut Mahsulotlari</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root {
+  --bg: #f5f6fa;
+  --surface: #ffffff;
+  --border: #e8eaf0;
+  --accent: #2ecc71;
+  --accent-dark: #27ae60;
+  --accent2: #3498db;
+  --text: #1a1d27;
+  --muted: #8b90a7;
+  --red: #e74c3c;
+  --yellow: #f39c12;
+  --radius: 14px;
+  --shadow: 0 2px 16px rgba(0,0,0,0.08);
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--text); min-height:100vh; overflow-x:hidden; }
+
+/* PAGES */
+.page { display:none; min-height:100vh; padding-bottom:80px; }
+.page.active { display:block; }
+
+/* TOP NAV */
+.topnav { position:sticky; top:0; z-index:100; background:var(--surface); border-bottom:1px solid var(--border); padding:14px 16px; display:flex; align-items:center; justify-content:space-between; }
+.topnav-title { font-size:17px; font-weight:700; }
+.topnav-back { background:none; border:none; font-size:22px; cursor:pointer; color:var(--text); padding:0 8px 0 0; }
+.cart-btn { position:relative; background:var(--accent); color:#fff; border:none; border-radius:12px; padding:8px 14px; font-size:13px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; }
+.cart-count { background:#fff; color:var(--accent); border-radius:10px; padding:1px 6px; font-size:11px; font-weight:900; }
+
+/* BOTTOM NAV */
+.bottomnav { position:fixed; bottom:0; left:0; right:0; background:var(--surface); border-top:1px solid var(--border); display:flex; z-index:100; padding-bottom:env(safe-area-inset-bottom); }
+.bottomnav-item { flex:1; display:flex; flex-direction:column; align-items:center; padding:10px 0; cursor:pointer; border:none; background:none; color:var(--muted); font-size:10px; font-weight:500; gap:3px; transition:.15s; }
+.bottomnav-item.active { color:var(--accent); }
+.bottomnav-item .icon { font-size:22px; }
+.nav-badge { position:absolute; top:6px; right:calc(50% - 18px); background:var(--red); color:#fff; font-size:9px; font-weight:900; padding:1px 5px; border-radius:10px; }
+
+/* CATALOG */
+.catalog-header { padding:16px; }
+.catalog-header h2 { font-size:20px; font-weight:800; }
+.catalog-header p { font-size:13px; color:var(--muted); margin-top:2px; }
+.products-list { padding:0 16px; display:flex; flex-direction:column; gap:12px; }
+.product-card { background:var(--surface); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); display:flex; align-items:center; gap:14px; }
+.product-emoji { font-size:40px; flex-shrink:0; }
+.product-info { flex:1; }
+.product-name { font-size:15px; font-weight:700; }
+.product-price { font-size:16px; font-weight:800; color:var(--accent); margin-top:2px; }
+.product-price small { font-size:11px; color:var(--muted); font-weight:400; }
+.qty-control { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.qty-btn { width:32px; height:32px; border-radius:50%; border:none; font-size:20px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:.15s; }
+.qty-minus { background:#ffeaea; color:var(--red); }
+.qty-plus { background:#e8f8ef; color:var(--accent); }
+.qty-num { font-size:16px; font-weight:800; min-width:24px; text-align:center; }
+
+/* CART */
+.cart-empty { text-align:center; padding:60px 24px; }
+.cart-empty .emoji { font-size:56px; margin-bottom:12px; }
+.cart-empty p { color:var(--muted); font-size:15px; }
+.cart-items { padding:16px; display:flex; flex-direction:column; gap:10px; }
+.cart-item { background:var(--surface); border-radius:var(--radius); padding:14px 16px; box-shadow:var(--shadow); display:flex; align-items:center; gap:12px; }
+.cart-item-emoji { font-size:30px; }
+.cart-item-info { flex:1; }
+.cart-item-name { font-size:14px; font-weight:700; }
+.cart-item-price { font-size:12px; color:var(--muted); margin-top:2px; }
+.cart-item-total { font-size:15px; font-weight:800; color:var(--accent); }
+.cart-summary { margin:0 16px; background:var(--surface); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); }
+.summary-row { display:flex; justify-content:space-between; padding:6px 0; font-size:14px; }
+.summary-row.total { border-top:1px solid var(--border); margin-top:6px; padding-top:12px; font-weight:800; font-size:16px; }
+.summary-row.total .val { color:var(--accent); }
+
+/* ORDER FORM */
+.order-form { padding:16px; display:flex; flex-direction:column; gap:14px; }
+.form-section { background:var(--surface); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); }
+.form-section-title { font-size:13px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:12px; }
+.option-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.option-btn { padding:12px 8px; border-radius:10px; border:2px solid var(--border); background:var(--bg); color:var(--text); font-size:13px; font-weight:600; cursor:pointer; text-align:center; transition:.15s; }
+.option-btn.selected { border-color:var(--accent); background:#e8f8ef; color:var(--accent-dark); }
+.option-grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+.time-btn { padding:10px 4px; border-radius:10px; border:2px solid var(--border); background:var(--bg); color:var(--text); font-size:11px; font-weight:600; cursor:pointer; text-align:center; transition:.15s; line-height:1.4; }
+.time-btn .time-icon { font-size:18px; display:block; margin-bottom:3px; }
+.time-btn .time-range { font-size:10px; color:var(--muted); display:block; }
+.time-btn.selected { border-color:var(--accent); background:#e8f8ef; color:var(--accent-dark); }
+.time-btn.selected .time-range { color:var(--accent-dark); }
+.location-box { display:flex; align-items:center; gap:10px; background:var(--bg); border-radius:10px; padding:12px; }
+.location-icon { font-size:24px; }
+.location-text { flex:1; }
+.location-name { font-size:13px; font-weight:600; }
+.location-coords { font-size:11px; color:var(--muted); margin-top:2px; }
+.location-change { font-size:12px; color:var(--accent2); font-weight:600; cursor:pointer; border:none; background:none; }
+.order-items-preview { display:flex; flex-direction:column; gap:6px; }
+.order-preview-row { display:flex; justify-content:space-between; font-size:13px; }
+.order-preview-total { display:flex; justify-content:space-between; font-size:15px; font-weight:800; padding-top:10px; border-top:1px solid var(--border); margin-top:6px; }
+.order-preview-total .val { color:var(--accent); }
+
+/* ORDERS HISTORY */
+.orders-list { padding:16px; display:flex; flex-direction:column; gap:12px; }
+.order-card { background:var(--surface); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); }
+.order-card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.order-card-num { font-size:13px; font-weight:700; color:var(--muted); }
+.order-card-date { font-size:12px; color:var(--muted); }
+.order-card-items { font-size:13px; color:var(--text); margin-bottom:8px; line-height:1.6; }
+.order-card-footer { display:flex; justify-content:space-between; align-items:center; }
+.order-card-price { font-size:16px; font-weight:800; color:var(--accent); }
+.status-pill { padding:4px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+.pill-pending { background:#fef9e7; color:var(--yellow); }
+.pill-confirmed { background:#e8f4fd; color:var(--accent2); }
+.pill-completed { background:#e8f8ef; color:var(--accent-dark); }
+.pill-cancelled { background:#fdecea; color:var(--red); }
+.order-card-time { font-size:11px; color:var(--muted); margin-top:6px; }
+
+/* MAIN BUTTON */
+.main-btn { position:fixed; bottom:calc(70px + env(safe-area-inset-bottom)); left:16px; right:16px; padding:16px; background:var(--accent); color:#fff; border:none; border-radius:14px; font-size:16px; font-weight:800; cursor:pointer; box-shadow:0 4px 20px rgba(46,204,113,0.4); transition:.15s; z-index:99; }
+.main-btn:active { transform:scale(0.98); }
+.main-btn:disabled { background:var(--border); color:var(--muted); box-shadow:none; cursor:not-allowed; }
+
+/* SUCCESS */
+.success-screen { display:none; position:fixed; inset:0; background:var(--surface); z-index:999; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:32px; }
+.success-screen.show { display:flex; }
+.success-emoji { font-size:72px; margin-bottom:20px; animation:pop .4s ease; }
+@keyframes pop { 0%{transform:scale(0)} 70%{transform:scale(1.15)} 100%{transform:scale(1)} }
+.success-title { font-size:24px; font-weight:800; margin-bottom:10px; }
+.success-sub { font-size:15px; color:var(--muted); margin-bottom:8px; }
+.success-detail { font-size:14px; color:var(--text); background:var(--bg); border-radius:10px; padding:14px 20px; margin-top:16px; width:100%; text-align:left; line-height:1.8; }
+.success-btn { margin-top:24px; padding:14px 32px; background:var(--accent); color:#fff; border:none; border-radius:12px; font-size:15px; font-weight:700; cursor:pointer; }
+
+/* LOADER */
+.loader { display:flex; align-items:center; justify-content:center; padding:40px; gap:10px; color:var(--muted); }
+.spinner { width:22px; height:22px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* TOAST */
+.toast { position:fixed; top:20px; left:50%; transform:translateX(-50%); background:#1a1d27; color:#fff; border-radius:10px; padding:10px 20px; font-size:13px; font-weight:600; z-index:9999; animation:fadeInOut 2.5s ease forwards; white-space:nowrap; }
+@keyframes fadeInOut { 0%{opacity:0;top:30px} 15%{opacity:1;top:20px} 80%{opacity:1} 100%{opacity:0} }
+</style>
+</head>
+<body>
+
+<!-- CATALOG PAGE -->
+<div class="page active" id="page-catalog">
+  <div class="topnav">
+    <div class="topnav-title">🥛 Mahsulotlar</div>
+    <button class="cart-btn" onclick="goPage('cart')" id="cart-topbtn" style="display:none">
+      🛒 Savat <span class="cart-count" id="cart-count-top">0</span>
+    </button>
+  </div>
+  <div class="catalog-header">
+    <h2>Sut mahsulotlari</h2>
+    <p>Toza va sifatli, har kuni yetkazib beramiz</p>
+  </div>
+  <div class="products-list" id="products-list">
+    <div class="loader"><div class="spinner"></div> Yuklanmoqda...</div>
+  </div>
+</div>
+
+<!-- CART PAGE -->
+<div class="page" id="page-cart">
+  <div class="topnav">
+    <button class="topnav-back" onclick="goPage('catalog')">←</button>
+    <div class="topnav-title">🛒 Savatcha</div>
+    <div></div>
+  </div>
+  <div id="cart-content"></div>
+  <button class="main-btn" id="cart-order-btn" onclick="goPage('order')">Buyurtma berish →</button>
+</div>
+
+<!-- ORDER PAGE -->
+<div class="page" id="page-order">
+  <div class="topnav">
+    <button class="topnav-back" onclick="goPage('cart')">←</button>
+    <div class="topnav-title">📋 Buyurtma</div>
+    <div></div>
+  </div>
+  <div class="order-form">
+
+    <!-- Delivery date -->
+    <div class="form-section">
+      <div class="form-section-title">📅 Yetkazish kuni</div>
+      <div class="option-grid">
+        <button class="option-btn selected" id="day-today" onclick="selectDay('today')">
+          📅 Bugun<br><small id="today-label" style="font-weight:400;color:var(--muted)"></small>
+        </button>
+        <button class="option-btn" id="day-tomorrow" onclick="selectDay('tomorrow')">
+          📅 Ertaga<br><small id="tomorrow-label" style="font-weight:400;color:var(--muted)"></small>
+        </button>
+      </div>
+    </div>
+
+    <!-- Delivery time -->
+    <div class="form-section">
+      <div class="form-section-title">⏰ Yetkazish vaqti</div>
+      <div class="option-grid-3">
+        <button class="time-btn selected" id="time-morning" onclick="selectTime('morning')">
+          <span class="time-icon">🌅</span>
+          Ertalab
+          <span class="time-range">06:00–07:00</span>
+        </button>
+        <button class="time-btn" id="time-noon" onclick="selectTime('noon')">
+          <span class="time-icon">☀️</span>
+          Kunduz
+          <span class="time-range">12:00–13:00</span>
+        </button>
+        <button class="time-btn" id="time-evening" onclick="selectTime('evening')">
+          <span class="time-icon">🌆</span>
+          Kechqurun
+          <span class="time-range">18:00–19:00</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Location -->
+    <div class="form-section">
+      <div class="form-section-title">📍 Yetkazish manzili</div>
+      <div class="location-box" id="location-box">
+        <div class="location-icon">📍</div>
+        <div class="location-text">
+          <div class="location-name" id="location-name">Saqlangan manzil ishlatiladi</div>
+          <div class="location-coords" id="location-coords"></div>
+        </div>
+        <button class="location-change" onclick="requestLocation()">O'zgartirish</button>
+      </div>
+    </div>
+
+    <!-- Order summary -->
+    <div class="form-section">
+      <div class="form-section-title">🧾 Buyurtma tarkibi</div>
+      <div class="order-items-preview" id="order-preview"></div>
+    </div>
+
+  </div>
+  <button class="main-btn" id="confirm-btn" onclick="confirmOrder()">✅ Tasdiqlash</button>
+</div>
+
+<!-- ORDERS HISTORY PAGE -->
+<div class="page" id="page-orders">
+  <div class="topnav">
+    <div class="topnav-title">📦 Buyurtmalarim</div>
+    <div></div>
+  </div>
+  <div id="orders-content">
+    <div class="loader"><div class="spinner"></div> Yuklanmoqda...</div>
+  </div>
+</div>
+
+<!-- BOTTOM NAV -->
+<div class="bottomnav">
+  <button class="bottomnav-item active" id="nav-catalog" onclick="goPage('catalog')">
+    <span class="icon">🏪</span>Katalog
+  </button>
+  <button class="bottomnav-item" id="nav-cart" onclick="goPage('cart')" style="position:relative">
+    <span class="icon">🛒</span>Savatcha
+    <span class="nav-badge" id="nav-cart-badge" style="display:none">0</span>
+  </button>
+  <button class="bottomnav-item" id="nav-orders" onclick="goPage('orders')">
+    <span class="icon">📦</span>Buyurtmalar
+  </button>
+</div>
+
+<!-- SUCCESS SCREEN -->
+<div class="success-screen" id="success-screen">
+  <div class="success-emoji">🎉</div>
+  <div class="success-title">Buyurtma qabul qilindi!</div>
+  <div class="success-sub">Tez orada yetkazib beramiz</div>
+  <div class="success-detail" id="success-detail"></div>
+  <button class="success-btn" onclick="afterSuccess()">Bosh sahifaga →</button>
+</div>
+
+<script>
+// ============================================================
+// TELEGRAM MINI APP INIT
+// ============================================================
+const tg = window.Telegram.WebApp;
+tg.ready();
+tg.expand();
+
+// Colors from Telegram theme
+document.documentElement.style.setProperty('--tg-bg', tg.themeParams.bg_color || '#f5f6fa');
+
+// ============================================================
+// STATE
+// ============================================================
+const BASE_URL = '%%BASE_URL%%'; // bot.py da to'ldiriladi
+let TOKEN = '%%API_TOKEN%%';    // bot.py da to'ldiriladi
+let USER_TG_ID = tg.initDataUnsafe?.user?.id || null;
+
+let products = [];
+let cart = {}; // { product_id: quantity }
+let selectedDay = 'today';
+let selectedTime = 'morning';
+let userLocation = null; // { lat, lon } — agar yangi tanlasa
+let currentPage = 'catalog';
+
+const TIME_MAP = {
+  morning: { start: '06:00', end: '07:00' },
+  noon:    { start: '12:00', end: '13:00' },
+  evening: { start: '18:00', end: '19:00' }
+};
+
+// ============================================================
+// PAGE NAV
+// ============================================================
+function goPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelectorAll('.bottomnav-item').forEach(b => b.classList.remove('active'));
+  const navEl = document.getElementById('nav-' + page);
+  if (navEl) navEl.classList.add('active');
+  currentPage = page;
+
+  if (page === 'cart') renderCart();
+  if (page === 'order') renderOrderForm();
+  if (page === 'orders') loadOrders();
+
+  // Back button
+  tg.BackButton[['cart','order'].includes(page) ? 'show' : 'hide']();
+}
+
+tg.BackButton.onClick(() => {
+  if (currentPage === 'order') goPage('cart');
+  else if (currentPage === 'cart') goPage('catalog');
+  else tg.BackButton.hide();
+});
+
+// ============================================================
+// API
+// ============================================================
+async function apiFetch(path, method='GET', body=null) {
+  const opts = { method, headers: { 'Authorization': 'Bearer ' + TOKEN } };
+  if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  try {
+    const r = await fetch(BASE_URL + path, opts);
+    return await r.json();
+  } catch (e) {
+    console.error('API error:', e);
+    return null;
+  }
+}
+
+// ============================================================
+// CATALOG
+// ============================================================
+async function loadProducts() {
+  const data = await apiFetch('/api/products');
+  if (!data) { showToast('Xatolik yuz berdi'); return; }
+  products = Array.isArray(data) ? data.filter(p => p.is_active) : [];
+  renderProducts();
+}
+
+const EMOJIS = { 'Qatiq':'🥛', 'Qaymoq':'🧈', 'Tvorog':'🧀', 'Malako':'🍼' };
+function getEmoji(name) {
+  for (const [k, v] of Object.entries(EMOJIS)) if (name.toLowerCase().includes(k.toLowerCase())) return v;
+  return '🥛';
+}
+
+function renderProducts() {
+  const list = document.getElementById('products-list');
+  if (!products.length) { list.innerHTML = '<div class="loader">Mahsulotlar yo\'q</div>'; return; }
+  list.innerHTML = products.map(p => `
+    <div class="product-card">
+      <div class="product-emoji">${getEmoji(p.name)}</div>
+      <div class="product-info">
+        <div class="product-name">${esc(p.name)}</div>
+        <div class="product-price">${fmtPrice(p.price)} <small>so'm</small></div>
+      </div>
+      <div class="qty-control">
+        <button class="qty-btn qty-minus" onclick="changeQty(${p.id}, -1)">−</button>
+        <div class="qty-num" id="qty-${p.id}">${cart[p.id] || 0}</div>
+        <button class="qty-btn qty-plus" onclick="changeQty(${p.id}, 1)">+</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function changeQty(id, delta) {
+  const cur = cart[id] || 0;
+  const next = Math.max(0, cur + delta);
+  if (next === 0) delete cart[id]; else cart[id] = next;
+  const el = document.getElementById('qty-' + id);
+  if (el) el.textContent = next;
+  updateCartBadge();
+}
+
+function updateCartBadge() {
+  const total = Object.values(cart).reduce((s, v) => s + v, 0);
+  document.getElementById('cart-count-top').textContent = total;
+  document.getElementById('nav-cart-badge').textContent = total;
+  document.getElementById('cart-count-top').parentElement.style.display = total > 0 ? 'flex' : 'none';
+  document.getElementById('nav-cart-badge').style.display = total > 0 ? '' : 'none';
+}
+
+// ============================================================
+// CART
+// ============================================================
+function getCartItems() {
+  return products.filter(p => cart[p.id] > 0).map(p => ({
+    ...p, quantity: cart[p.id], subtotal: p.price * cart[p.id]
+  }));
+}
+
+function renderCart() {
+  const items = getCartItems();
+  const content = document.getElementById('cart-content');
+  const btn = document.getElementById('cart-order-btn');
+
+  if (!items.length) {
+    content.innerHTML = `<div class="cart-empty"><div class="emoji">🛒</div><p>Savatcha bo'sh<br>Katalogdan mahsulot tanlang</p></div>`;
+    btn.disabled = true;
+    btn.textContent = 'Mahsulot tanlang';
+    return;
+  }
+
+  const total = items.reduce((s, i) => s + i.subtotal, 0);
+  content.innerHTML = `
+    <div class="cart-items">
+      ${items.map(i => `
+        <div class="cart-item">
+          <div class="cart-item-emoji">${getEmoji(i.name)}</div>
+          <div class="cart-item-info">
+            <div class="cart-item-name">${esc(i.name)}</div>
+            <div class="cart-item-price">${fmtPrice(i.price)} so'm × ${i.quantity}</div>
+          </div>
+          <div class="qty-control">
+            <button class="qty-btn qty-minus" onclick="changeQty(${i.id},-1);renderCart()">−</button>
+            <div class="qty-num">${i.quantity}</div>
+            <button class="qty-btn qty-plus" onclick="changeQty(${i.id},1);renderCart()">+</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+    <div class="cart-summary">
+      ${items.map(i => `<div class="summary-row"><span>${esc(i.name)} × ${i.quantity}</span><span>${fmtPrice(i.subtotal)} so'm</span></div>`).join('')}
+      <div class="summary-row total"><span>Jami</span><span class="val">${fmtPrice(total)} so'm</span></div>
+    </div>
+  `;
+  btn.disabled = false;
+  btn.textContent = `Buyurtma berish → ${fmtPrice(total)} so'm`;
+}
+
+// ============================================================
+// ORDER FORM
+// ============================================================
+function renderOrderForm() {
+  // Set day labels
+  const today = new Date();
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+  document.getElementById('today-label').textContent = formatDateLabel(today);
+  document.getElementById('tomorrow-label').textContent = formatDateLabel(tomorrow);
+
+  // Order preview
+  const items = getCartItems();
+  const total = items.reduce((s, i) => s + i.subtotal, 0);
+  document.getElementById('order-preview').innerHTML = `
+    ${items.map(i => `<div class="order-preview-row"><span>${getEmoji(i.name)} ${esc(i.name)} × ${i.quantity}</span><span>${fmtPrice(i.subtotal)} so'm</span></div>`).join('')}
+    <div class="order-preview-total"><span>Jami to'lov</span><span class="val">${fmtPrice(total)} so'm</span></div>
+  `;
+
+  // Location
+  if (userLocation) {
+    document.getElementById('location-name').textContent = 'Yangi manzil tanlandi';
+    document.getElementById('location-coords').textContent = `${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}`;
+  }
+
+  // Confirm button
+  const btn = document.getElementById('confirm-btn');
+  btn.textContent = `✅ Tasdiqlash — ${fmtPrice(total)} so'm`;
+}
+
+function selectDay(day) {
+  selectedDay = day;
+  document.getElementById('day-today').classList.toggle('selected', day === 'today');
+  document.getElementById('day-tomorrow').classList.toggle('selected', day === 'tomorrow');
+}
+
+function selectTime(time) {
+  selectedTime = time;
+  ['morning','noon','evening'].forEach(t => {
+    document.getElementById('time-' + t).classList.toggle('selected', t === time);
+  });
+}
+
+function requestLocation() {
+  tg.showPopup({
+    title: 'Manzil',
+    message: 'Joriy joylashuvingizni aniqlaylikmi?',
+    buttons: [
+      { id: 'yes', type: 'default', text: 'Ha, aniqlash' },
+      { id: 'no', type: 'cancel', text: 'Yo\'q' }
+    ]
+  }, (btnId) => {
+    if (btnId !== 'yes') return;
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          userLocation = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+          document.getElementById('location-name').textContent = 'Joriy joylashuv';
+          document.getElementById('location-coords').textContent = `${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}`;
+          showToast('📍 Manzil yangilandi!');
+        },
+        () => showToast('Manzilni aniqlab bo\'lmadi')
+      );
+    }
+  });
+}
+
+// ============================================================
+// CONFIRM ORDER
+// ============================================================
+async function confirmOrder() {
+  const btn = document.getElementById('confirm-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Yuborilmoqda...';
+
+  const items = getCartItems();
+  if (!items.length) { showToast('Savatcha bo\'sh!'); btn.disabled = false; return; }
+
+  const today = new Date();
+  const deliveryDate = selectedDay === 'tomorrow'
+    ? new Date(today.setDate(today.getDate() + 1)).toISOString().split('T')[0]
+    : new Date().toISOString().split('T')[0];
+
+  const timeSlot = TIME_MAP[selectedTime];
+  const total = items.reduce((s, i) => s + i.subtotal, 0);
+
+  const payload = {
+    telegram_id: USER_TG_ID,
+    items: items.map(i => ({ product_id: i.id, quantity: i.quantity, price: i.price })),
+    total_price: total,
+    delivery_date: deliveryDate,
+    delivery_time_start: timeSlot.start,
+    delivery_time_end: timeSlot.end,
+    latitude: userLocation?.lat || null,
+    longitude: userLocation?.lon || null
+  };
+
+  const result = await apiFetch('/api/miniapp/order', 'POST', payload);
+
+  btn.disabled = false;
+  if (result?.success) {
+    // Show success
+    const dayLabel = selectedDay === 'today' ? 'Bugun' : 'Ertaga';
+    const timeLabel = { morning:'Ertalab 06:00–07:00', noon:'Kunduz 12:00–13:00', evening:'Kechqurun 18:00–19:00' }[selectedTime];
+    document.getElementById('success-detail').innerHTML = `
+      📅 <b>${dayLabel}</b>, ${timeLabel}<br>
+      📦 ${items.map(i => `${getEmoji(i.name)} ${i.name} × ${i.quantity}`).join('<br>')}<br>
+      💰 Jami: <b>${fmtPrice(total)} so'm</b>
+    `;
+    document.getElementById('success-screen').classList.add('show');
+    tg.HapticFeedback.notificationOccurred('success');
+    cart = {};
+    updateCartBadge();
+    renderProducts();
+  } else {
+    showToast(result?.error || 'Xatolik yuz berdi. Qayta urinib ko\'ring.');
+    btn.textContent = `✅ Tasdiqlash — ${fmtPrice(total)} so'm`;
+  }
+}
+
+function afterSuccess() {
+  document.getElementById('success-screen').classList.remove('show');
+  goPage('catalog');
+}
+
+// ============================================================
+// ORDERS HISTORY
+// ============================================================
+async function loadOrders() {
+  document.getElementById('orders-content').innerHTML = '<div class="loader"><div class="spinner"></div> Yuklanmoqda...</div>';
+  if (!USER_TG_ID) {
+    document.getElementById('orders-content').innerHTML = '<div class="loader">Foydalanuvchi aniqlanmadi</div>';
+    return;
+  }
+  const data = await apiFetch(`/api/miniapp/orders/${USER_TG_ID}`);
+  if (!data || !data.length) {
+    document.getElementById('orders-content').innerHTML = `
+      <div class="cart-empty"><div class="emoji">📦</div><p>Hali buyurtma berilmagan</p></div>`;
+    return;
+  }
+  const statusMap = {
+    pending:   { text:'⏳ Kutmoqda',     cls:'pill-pending' },
+    confirmed: { text:'✅ Tasdiqlangan', cls:'pill-confirmed' },
+    completed: { text:'🚚 Yetkazildi',   cls:'pill-completed' },
+    cancelled: { text:'❌ Bekor',        cls:'pill-cancelled' }
+  };
+  document.getElementById('orders-content').innerHTML = `
+    <div class="orders-list">
+      ${data.map(o => {
+        const st = statusMap[o.status] || { text: o.status, cls:'pill-pending' };
+        const itemsText = (o.items||[]).filter(i=>i.product_name).map(i=>`${getEmoji(i.product_name)} ${i.product_name} × ${i.quantity}`).join('<br>');
+        return `
+          <div class="order-card">
+            <div class="order-card-header">
+              <div class="order-card-num">#${o.order_id}</div>
+              <span class="status-pill ${st.cls}">${st.text}</span>
+            </div>
+            <div class="order-card-items">${itemsText || '—'}</div>
+            <div class="order-card-footer">
+              <div class="order-card-price">${fmtPrice(o.total_price)} so'm</div>
+              <div class="order-card-date">${o.delivery_date}</div>
+            </div>
+            <div class="order-card-time">⏰ ${o.delivery_time_start} – ${o.delivery_time_end}</div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+// ============================================================
+// UTILS
+// ============================================================
+function fmtPrice(v) { return Number(v||0).toLocaleString('uz-UZ'); }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function formatDateLabel(d) {
+  return d.toLocaleDateString('uz-UZ', { day:'numeric', month:'long' });
+}
+function showToast(msg) {
+  document.querySelectorAll('.toast').forEach(t => t.remove());
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2600);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+loadProducts();
+</script>
+</body>
+</html>

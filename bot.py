@@ -300,6 +300,117 @@ async def api_broadcast(request):
         logger.error(f"api_broadcast: {e}")
         return web.json_response({"error": str(e)}, status=500)
 
+# --- MINI APP ---
+
+async def api_miniapp_order(request):
+    """Mini App orqali buyurtma qabul qilish. Token tekshirilmaydi — Telegram initData ishlatiladi."""
+    try:
+        from decimal import Decimal
+        from database import models
+        data = await request.json()
+
+        telegram_id = data.get("telegram_id")
+        items = data.get("items", [])
+        total_price = data.get("total_price", 0)
+        delivery_date_str = data.get("delivery_date")
+        delivery_time_start = data.get("delivery_time_start", "06:00")
+        delivery_time_end = data.get("delivery_time_end", "07:00")
+        new_lat = data.get("latitude")
+        new_lon = data.get("longitude")
+
+        if not telegram_id or not items:
+            return web.json_response({"error": "Ma'lumotlar to'liq emas!"}, status=400)
+
+        # Foydalanuvchi tekshiruvi
+        user = await models.get_user_by_telegram_id(int(telegram_id))
+        if not user:
+            return web.json_response({"error": "Foydalanuvchi topilmadi! Avval botdan ro'yxatdan o'ting."}, status=404)
+
+        # Agar yangi lokatsiya yuborilgan bo'lsa — yangilash
+        if new_lat and new_lon:
+            from database.connection import execute_query
+            await execute_query(
+                "UPDATE users SET latitude = $1, longitude = $2 WHERE telegram_id = $3;",
+                float(new_lat), float(new_lon), int(telegram_id)
+            )
+
+        import datetime
+        delivery_date = datetime.date.fromisoformat(delivery_date_str) if delivery_date_str else datetime.date.today()
+
+        cart_items = [
+            {
+                'product_id': i['product_id'],
+                'quantity': float(i['quantity']),
+                'price': Decimal(str(i['price']))
+            }
+            for i in items
+        ]
+
+        order_id = await models.create_order(
+            telegram_id=int(telegram_id),
+            cart_items=cart_items,
+            total_price=Decimal(str(total_price)),
+            delivery_date=delivery_date,
+            delivery_time_start=delivery_time_start,
+            delivery_time_end=delivery_time_end
+        )
+
+        logger.info(f"MiniApp: Yangi buyurtma #{order_id} — tg:{telegram_id}")
+
+        # Foydalanuvchiga tasdiqlash xabari
+        time_label = {
+            '06:00': '🌅 Ertalab 06:00–07:00',
+            '12:00': '☀️ Kunduz 12:00–13:00',
+            '18:00': '🌆 Kechqurun 18:00–19:00'
+        }.get(delivery_time_start, f'{delivery_time_start}–{delivery_time_end}')
+
+        items_text = '\n'.join([f"• {i['quantity']} dona — {i['product_id']}" for i in items])
+        try:
+            await bot.send_message(
+                chat_id=int(telegram_id),
+                text=(
+                    f"✅ *Buyurtma #{order_id} qabul qilindi!*\n\n"
+                    f"📅 Yetkazish: *{delivery_date.strftime('%d.%m.%Y')}*\n"
+                    f"⏰ Vaqt: *{time_label}*\n"
+                    f"💰 Jami: *{int(total_price):,} so'm*\n\n"
+                    f"Buyurtmangiz tasdiqlangach xabar beramiz! 🚚"
+                ),
+                parse_mode="Markdown"
+            )
+        except Exception as notify_err:
+            logger.warning(f"MiniApp: Xabar yuborishda xato {telegram_id}: {notify_err}")
+
+        return web.json_response({"success": True, "order_id": order_id})
+
+    except Exception as e:
+        logger.error(f"api_miniapp_order: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+
+async def api_miniapp_get_orders(request):
+    """Mini App uchun foydalanuvchining buyurtmalari."""
+    try:
+        from database import models
+        telegram_id = int(request.match_info['telegram_id'])
+        orders = await models.get_user_orders(telegram_id, limit=10)
+
+        result = []
+        for o in orders:
+            order_dict = dict(o)
+            if hasattr(order_dict.get('delivery_date'), 'strftime'):
+                order_dict['delivery_date'] = order_dict['delivery_date'].strftime("%d.%m.%Y")
+            if hasattr(order_dict.get('created_at'), 'strftime'):
+                order_dict['created_at'] = order_dict['created_at'].strftime("%d.%m.%Y %H:%M")
+            if order_dict.get('total_price'):
+                order_dict['total_price'] = float(order_dict['total_price'])
+            result.append(order_dict)
+
+        return web.json_response(result)
+    except Exception as e:
+        logger.error(f"api_miniapp_get_orders: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+
 # ============================================================
 # WEB SERVER
 # ============================================================
@@ -331,11 +442,18 @@ async def start_web_server():
     # Broadcast
     app.router.add_post('/api/broadcast', api_broadcast)
 
+    # Mini App
+    app.router.add_post('/api/miniapp/order', api_miniapp_order)
+    app.router.add_get('/api/miniapp/orders/{telegram_id}', api_miniapp_get_orders)
+
     # --- Static Pages ---
     static_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
 
     async def index_handler(request):
         return web.FileResponse(os.path.join(static_path, 'index.html'))
+
+    async def miniapp_handler(request):
+        return web.FileResponse(os.path.join(static_path, 'miniapp.html'))
 
     async def sw_handler(request):
         return web.FileResponse(os.path.join(static_path, 'sw.js'))
@@ -345,7 +463,8 @@ async def start_web_server():
 
     app.router.add_get('/', handle_health)
     app.router.add_get('/chorvador-panel', index_handler)
-    app.router.add_get('/chorvador-panel/login', index_handler)  # SPA — hamma narsa index.html
+    app.router.add_get('/chorvador-panel/login', index_handler)
+    app.router.add_get('/miniapp', miniapp_handler)
     app.router.add_get('/sw.js', sw_handler)
     app.router.add_get('/manifest.json', manifest_handler)
     app.router.add_static('/static/', static_path, name='static')
