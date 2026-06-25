@@ -453,7 +453,14 @@ async def start_web_server():
         return web.FileResponse(os.path.join(static_path, 'index.html'))
 
     async def miniapp_handler(request):
-        return web.FileResponse(os.path.join(static_path, 'miniapp.html'))
+        base_url = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
+        token = get_auth_token()
+        miniapp_path = os.path.join(static_path, 'miniapp.html')
+        with open(miniapp_path, 'r', encoding='utf-8') as f:
+            html = f.read()
+        html = html.replace('%%BASE_URL%%', base_url)
+        html = html.replace('%%API_TOKEN%%', token)
+        return web.Response(text=html, content_type='text/html')
 
     async def sw_handler(request):
         return web.FileResponse(os.path.join(static_path, 'sw.js'))
