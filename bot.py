@@ -113,7 +113,8 @@ async def api_get_orders(request):
         return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
     try:
         from database import models
-        orders = await models.get_dashboard_orders()
+        date_filter = request.rel_url.query.get('date', None)
+        orders = await models.get_dashboard_orders(date_filter=date_filter)
         return web.json_response(orders)
     except Exception as e:
         logger.error(f"api_get_orders: {e}")

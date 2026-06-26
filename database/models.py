@@ -336,15 +336,86 @@ async def get_dashboard_stats() -> Dict[str, Any]:
             "orders": r["daily_orders"]
         })
         
+    # 5. Monthly stats (last 6 months)
+    monthly_query = """
+        SELECT 
+            TO_CHAR(d.month, 'YYYY-MM') as month_label,
+            COALESCE(SUM(o.total_price), 0) as revenue,
+            COUNT(o.id) as order_count,
+            COALESCE(SUM(oi_agg.total_qty), 0) as total_qty
+        FROM generate_series(
+            DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '5 months',
+            DATE_TRUNC('month', CURRENT_DATE),
+            '1 month'::interval
+        ) d(month)
+        LEFT JOIN orders o ON DATE_TRUNC('month', o.delivery_date) = d.month
+            AND o.status IN ('confirmed', 'completed')
+        LEFT JOIN (
+            SELECT order_id, SUM(quantity) as total_qty FROM order_items GROUP BY order_id
+        ) oi_agg ON oi_agg.order_id = o.id
+        GROUP BY d.month
+        ORDER BY d.month ASC;
+    """
+    monthly_rows = await fetch_rows(monthly_query)
+    monthly_data = []
+    for r in monthly_rows:
+        monthly_data.append({
+            "month": r["month_label"],
+            "revenue": float(r["revenue"]),
+            "orders": r["order_count"],
+            "qty": float(r["total_qty"])
+        })
+
+    # 6. Today stats
+    today = datetime.date.today()
+    today_row = await fetch_row(
+        "SELECT COALESCE(SUM(total_price),0) as rev, COUNT(*) as cnt FROM orders WHERE delivery_date=$1 AND status IN ('confirmed','completed');",
+        today
+    )
+    
+    # 7. Top products (last 30 days)
+    top_products_query = """
+        SELECT p.name, SUM(oi.quantity) as total_qty, SUM(oi.quantity * oi.price_at_purchase) as total_rev
+        FROM order_items oi
+        JOIN products p ON oi.product_id = p.id
+        JOIN orders o ON oi.order_id = o.id
+        WHERE o.delivery_date >= CURRENT_DATE - INTERVAL '30 days'
+          AND o.status IN ('confirmed', 'completed')
+        GROUP BY p.name ORDER BY total_qty DESC;
+    """
+    top_rows = await fetch_rows(top_products_query)
+    top_products = [{"name": r["name"], "qty": float(r["total_qty"]), "rev": float(r["total_rev"])} for r in top_rows]
+
+    # 8. Forecast: average daily qty per product * 30
+    forecast_query = """
+        SELECT p.name,
+            ROUND(SUM(oi.quantity)::numeric / GREATEST(COUNT(DISTINCT o.delivery_date), 1), 1) as avg_daily
+        FROM order_items oi
+        JOIN products p ON oi.product_id = p.id
+        JOIN orders o ON oi.order_id = o.id
+        WHERE o.delivery_date >= CURRENT_DATE - INTERVAL '30 days'
+          AND o.status IN ('confirmed', 'completed')
+        GROUP BY p.name ORDER BY avg_daily DESC;
+    """
+    forecast_rows = await fetch_rows(forecast_query)
+    forecast = [{"name": r["name"], "avg_daily": float(r["avg_daily"]), "monthly": float(r["avg_daily"]) * 30} for r in forecast_rows]
+
     return {
         "total_customers": total_customers,
         "total_orders": total_orders,
         "total_revenue": float(total_revenue),
-        "chart_data": chart_data
+        "today_revenue": float(today_row["rev"]) if today_row else 0,
+        "today_orders": today_row["cnt"] if today_row else 0,
+        "chart_data": chart_data,
+        "monthly_data": monthly_data,
+        "top_products": top_products,
+        "forecast": forecast
     }
 
-async def get_dashboard_orders() -> List[Dict[str, Any]]:
-    """Retrieves all orders with user and items details, sorted for dashboard viewing."""
+async def get_dashboard_orders(date_filter: str = None) -> List[Dict[str, Any]]:
+    """Retrieves today\'s orders with user and items details, sorted for dashboard viewing."""
+    if date_filter is None:
+        date_filter = datetime.date.today().isoformat()
     query = """
         SELECT o.id as order_id, o.status, o.total_price, o.delivery_date, o.delivery_time_start, 
                o.delivery_time_end, o.created_at, u.full_name, u.phone_number, u.telegram_id,
@@ -358,6 +429,7 @@ async def get_dashboard_orders() -> List[Dict[str, Any]]:
         JOIN users u ON o.user_id = u.id
         LEFT JOIN order_items oi ON o.id = oi.order_id
         LEFT JOIN products p ON oi.product_id = p.id
+        WHERE o.delivery_date = $1::date
         GROUP BY o.id, u.id
         ORDER BY 
             CASE 
@@ -368,7 +440,7 @@ async def get_dashboard_orders() -> List[Dict[str, Any]]:
             END ASC,
             o.created_at DESC;
     """
-    rows = await fetch_rows(query)
+    rows = await fetch_rows(query, date_filter)
     result = []
     for r in rows:
         order_dict = dict(r)
