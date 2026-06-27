@@ -522,6 +522,10 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
                 <div class="map-stat"><div class="map-stat-val" id="map-done" style="color:var(--green)">0</div><div class="map-stat-label">Yetkazildi</div></div>
                 <div class="map-stat"><div class="map-stat-val" id="map-left" style="color:var(--yellow)">0</div><div class="map-stat-label">Qoldi</div></div>
               </div>
+              <button id="route-btn" onclick="startRoute()" style="width:100%;margin-top:10px;padding:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                🚗 Marshrutni boshlash
+              </button>
+              <div id="route-status" style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px;"></div>
             </div>
             <div class="map-orders-list" id="map-orders-list">
               <div class="loader"><div class="spinner"></div></div>
@@ -1422,6 +1426,147 @@ async function saveMiniappSettings() {
   }
   showToast('Saqlandi!', 'success');
   loadMiniappEditor();
+}
+
+// ==================== ROUTING (OpenRouteService) ====================
+const ORS_API_KEY = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImYyZjA3OWRhOGFhOTRlYTliYjk5YjEzZGJjMGJmMThiIiwiaCI6Im11cm11cjY0In0='; // openrouteservice.org dan olingan kalit
+let routeLayer = null;
+let myPosition = null;
+
+async function startRoute() {
+  const btn = document.getElementById('route-btn');
+  const status = document.getElementById('route-status');
+
+  if (!mapOrders.length) {
+    showToast('Bugun yetkazish kerak bo'lgan buyurtma yo'q', 'error');
+    return;
+  }
+
+  btn.textContent = '⏳ Joylashuv aniqlanmoqda...';
+  btn.disabled = true;
+  status.textContent = '';
+
+  // 1. Get current position
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    myPosition = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+    status.textContent = `📍 Joylashuv aniqlandi`;
+
+    // 2. Sort orders by distance from current position (greedy nearest neighbor)
+    const pending = mapOrders.filter(o => o.status !== 'completed');
+    const sorted = sortByNearest(myPosition, pending);
+
+    // Rebuild sidebar in sorted order
+    mapOrders = [...sorted, ...mapOrders.filter(o => o.status === 'completed')];
+    renderMapSidebar();
+
+    // 3. Build route
+    btn.textContent = '⏳ Marshrut tuzilmoqda...';
+    await drawRoute(myPosition, sorted);
+
+    btn.textContent = '🔄 Marshrutni yangilash';
+    btn.disabled = false;
+    status.textContent = `✅ ${sorted.length} ta buyurtma, eng yaqinidan tartiblab chiqildi`;
+  }, (err) => {
+    btn.textContent = '🚗 Marshrutni boshlash';
+    btn.disabled = false;
+    showToast('Joylashuvni aniqlab bo'lmadi', 'error');
+  }, { enableHighAccuracy: true, timeout: 10000 });
+}
+
+function sortByNearest(start, orders) {
+  if (!orders.length) return [];
+  const remaining = [...orders];
+  const sorted = [];
+  let current = start;
+
+  while (remaining.length) {
+    let minDist = Infinity, minIdx = 0;
+    remaining.forEach((o, i) => {
+      const d = haversine(current.lat, current.lon, o.latitude, o.longitude);
+      if (d < minDist) { minDist = d; minIdx = i; }
+    });
+    sorted.push(remaining[minIdx]);
+    current = { lat: remaining[minIdx].latitude, lon: remaining[minIdx].longitude };
+    remaining.splice(minIdx, 1);
+  }
+  return sorted;
+}
+
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+async function drawRoute(start, orders) {
+  if (routeLayer) { mapInstance.removeLayer(routeLayer); routeLayer = null; }
+
+  // Add "me" marker
+  const meIcon = L.divIcon({
+    className: '',
+    html: '<div style="width:36px;height:36px;border-radius:50%;background:#4f8ef7;border:3px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-size:18px;">🚗</div>',
+    iconSize: [36, 36], iconAnchor: [18, 18]
+  });
+  L.marker([start.lat, start.lon], { icon: meIcon }).addTo(mapInstance)
+    .bindPopup('<b>📍 Siz shu yerdasiz</b>').openPopup();
+
+  if (ORS_API_KEY === 'YOUR_ORS_API_KEY') {
+    // Fallback: draw straight lines without API
+    drawStraightRoute(start, orders);
+    return;
+  }
+
+  // Build coordinates array: start + all order points
+  const coords = [
+    [start.lon, start.lat],
+    ...orders.map(o => [o.longitude, o.latitude])
+  ];
+
+  try {
+    const res = await fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
+      method: 'POST',
+      headers: { 'Authorization': ORS_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coordinates: coords })
+    });
+    const data = await res.json();
+    if (data.features) {
+      routeLayer = L.geoJSON(data.features[0], {
+        style: { color: '#4f8ef7', weight: 4, opacity: 0.8 }
+      }).addTo(mapInstance);
+      mapInstance.fitBounds(routeLayer.getBounds(), { padding: [40, 40] });
+
+      // Show distance and time
+      const summary = data.features[0].properties.summary;
+      const km = (summary.distance / 1000).toFixed(1);
+      const min = Math.round(summary.duration / 60);
+      document.getElementById('route-status').textContent = `🛣️ ${km} km · ⏱️ ~${min} daqiqa`;
+    }
+  } catch (e) {
+    drawStraightRoute(start, orders);
+  }
+}
+
+function drawStraightRoute(start, orders) {
+  const points = [
+    [start.lat, start.lon],
+    ...orders.map(o => [o.latitude, o.longitude])
+  ];
+  routeLayer = L.polyline(points, {
+    color: '#4f8ef7', weight: 3, opacity: 0.7, dashArray: '8,6'
+  }).addTo(mapInstance);
+  mapInstance.fitBounds(routeLayer.getBounds(), { padding: [40, 40] });
+
+  // Number markers
+  orders.forEach((o, i) => {
+    L.divIcon({
+      className: '',
+      html: `<div style="width:22px;height:22px;border-radius:50%;background:#f59e0b;color:#fff;font-size:11px;font-weight:900;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);">${i+1}</div>`,
+      iconSize: [22, 22], iconAnchor: [11, 11]
+    });
+  });
+  document.getElementById('route-status').textContent = '⚠️ API kalit yo'q — to'g'ri chiziq ko'rsatilmoqda';
 }
 
 // ==================== AUTO LOGIN (if token saved) ====================
