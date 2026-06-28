@@ -229,7 +229,7 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
 .add-btn:hover { opacity:.88; }
 
 /* MAP PAGE */
-.map-page { display:flex; gap:0; height:calc(100vh - 57px); margin:-24px; overflow:hidden; }
+.map-page { display:flex; gap:0; height:calc(100vh - 57px); margin:-24px; overflow:hidden; min-height:600px; }
 .map-sidebar { width:320px; flex-shrink:0; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
 .map-sidebar-header { padding:16px; border-bottom:1px solid var(--border); flex-shrink:0; }
 .map-date-selector { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
@@ -254,7 +254,7 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
 .map-action-done { background:rgba(34,197,94,.15); color:var(--green); }
 .map-action-arrived:hover { background:rgba(245,158,11,.3); }
 .map-action-done:hover { background:rgba(34,197,94,.3); }
-#delivery-map { flex:1; z-index:1; }
+#delivery-map { flex:1; z-index:1; min-height:300px; width:100%; }
 .leaflet-popup-content-wrapper { background:var(--surface) !important; color:var(--text) !important; border:1px solid var(--border) !important; border-radius:10px !important; box-shadow:var(--shadow) !important; }
 .leaflet-popup-tip { background:var(--surface) !important; }
 .map-popup-title { font-size:14px; font-weight:700; margin-bottom:6px; }
@@ -306,9 +306,9 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
   .filter-row { flex-wrap:wrap; overflow-x:auto; padding-bottom:4px; }
   .filter-btn { white-space:nowrap; font-size:11px; padding:6px 10px; }
   .customers-table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
-  .map-page { flex-direction:column; height:auto; margin:0 -12px; }
-  .map-sidebar { width:100%; max-height:280px; }
-  #delivery-map { height:380px; }
+  .map-page { flex-direction:column; height:auto !important; margin:0 -12px; }
+  .map-sidebar { width:100%; max-height:260px; overflow-y:auto; }
+  #delivery-map { height:420px !important; min-height:420px; display:block !important; }
   .miniapp-editor { grid-template-columns:1fr; }
   .payment-stats { grid-template-columns:1fr 1fr; }
   .broadcast-card { max-width:100%; }
@@ -720,7 +720,7 @@ function navigate(page, btn) {
   if (page === 'customers') loadCustomers();
   if (page === 'broadcast') loadBroadcastInfo();
   if (page === 'payments') loadPayments();
-  if (page === 'map') initMap();
+  if (page === 'map') { initMap(); setTimeout(() => { if(mapInstance) mapInstance.invalidateSize(); }, 300); }
   if (page === 'miniapp') loadMiniappEditor();
 }
 
@@ -1241,6 +1241,8 @@ function initMap() {
     }).addTo(mapInstance);
   }
 
+  // Force map to recalculate size (fixes blank map on mobile)
+  setTimeout(() => { mapInstance.invalidateSize(); }, 200);
   loadMapOrders();
 }
 
