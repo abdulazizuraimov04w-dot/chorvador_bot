@@ -360,6 +360,40 @@ async def api_miniapp_order(request):
 
         logger.info(f"MiniApp: Yangi buyurtma #{order_id} — tg:{telegram_id}")
 
+        # Adminlarga xabar yuborish
+        try:
+            admin_ids_env = [int(x.strip()) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip().isdigit()]
+            db_users = await models.get_all_users()
+            for u in db_users:
+                if u.get("is_admin", False) and u['telegram_id'] not in admin_ids_env:
+                    admin_ids_env.append(u['telegram_id'])
+
+            items_text = ""
+            for i in items:
+                prod = next((p for p in await models.get_all_products() if p['id'] == i['product_id']), None)
+                name = prod['name'] if prod else f"Mahsulot #{i['product_id']}"
+                items_text += f"  - {name}: {i['quantity']} dona\n"
+
+            admin_text = (
+                f"🔔 *YANGI BUYURTMA (Mini App)*\n\n"
+                f"*Buyurtma:* #{order_id}\n"
+                f"*Mijoz:* {user['full_name']}\n"
+                f"*Telefon:* {user['phone_number']}\n"
+                f"*Yetkazish:* {delivery_date} | {delivery_time_start}–{delivery_time_end}\n\n"
+                f"*Mahsulotlar:*\n{items_text}"
+                f"💵 *Jami:* {int(total_price):,} so'm\n\n"
+                f"_Web Panelda ko'rish mumkin!_"
+            ).replace(",", " ")
+
+            for admin_id in admin_ids_env:
+                try:
+                    await bot.send_message(chat_id=admin_id, text=admin_text, parse_mode="Markdown")
+                    logger.info(f"MiniApp order notification sent to admin {admin_id}")
+                except Exception as ae:
+                    logger.warning(f"MiniApp: admin {admin_id} ga xabar yuborib bo'lmadi: {ae}")
+        except Exception as admin_err:
+            logger.error(f"MiniApp admin notification error: {admin_err}")
+
         # Foydalanuvchiga tasdiqlash xabari
         time_label = {
             '06:00': '🌅 Ertalab 06:00–07:00',
