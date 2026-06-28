@@ -303,6 +303,38 @@ async def get_daily_sales_report(date: datetime.date) -> Dict[str, Any]:
         "items": [dict(r) for r in rows_items]
     }
 
+async def get_undelivered_orders() -> List[Dict[str, Any]]:
+    """Barcha kunlardan yetkazilmagan (pending/confirmed) buyurtmalar."""
+    query = """
+        SELECT o.id as order_id, o.status, o.total_price, o.delivery_date, o.delivery_time_start, 
+               o.delivery_time_end, o.created_at, u.full_name, u.phone_number, u.telegram_id,
+               u.latitude, u.longitude,
+               array_to_json(array_agg(json_build_object(
+                   'product_name', p.name,
+                   'quantity', oi.quantity,
+                   'price', oi.price_at_purchase
+               ))) as items
+        FROM orders o
+        JOIN users u ON o.user_id = u.id
+        LEFT JOIN order_items oi ON o.id = oi.order_id
+        LEFT JOIN products p ON oi.product_id = p.id
+        WHERE o.status IN ('pending', 'confirmed')
+        GROUP BY o.id, u.id
+        ORDER BY o.delivery_date ASC, o.created_at ASC;
+    """
+    rows = await fetch_rows(query)
+    result = []
+    for r in rows:
+        row_dict = dict(r)
+        if row_dict.get('delivery_date'):
+            row_dict['delivery_date'] = row_dict['delivery_date'].strftime("%Y-%m-%d")
+        if row_dict.get('created_at'):
+            row_dict['created_at'] = row_dict['created_at'].strftime("%Y-%m-%d %H:%M")
+        if row_dict.get('total_price'):
+            row_dict['total_price'] = float(row_dict['total_price'])
+        result.append(row_dict)
+    return result
+
 async def get_dashboard_stats() -> Dict[str, Any]:
     """Retrieves analytical statistics for the web admin dashboard."""
     # 1. Total customers

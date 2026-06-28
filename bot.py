@@ -303,6 +303,17 @@ async def api_broadcast(request):
         logger.error(f"api_broadcast: {e}")
         return web.json_response({"error": str(e)}, status=500)
 
+async def api_get_undelivered_orders(request):
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        from database import models
+        orders = await models.get_undelivered_orders()
+        return web.json_response(orders)
+    except Exception as e:
+        logger.error(f"api_get_undelivered_orders: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
 # --- MINI APP ---
 
 async def api_miniapp_order(request):
@@ -478,6 +489,9 @@ async def start_web_server():
 
     # Broadcast
     app.router.add_post('/api/broadcast', api_broadcast)
+
+    # Yetkazilmagan buyurtmalar
+    app.router.add_get('/api/orders/undelivered', api_get_undelivered_orders)
 
     # Mini App
     app.router.add_post('/api/miniapp/order', api_miniapp_order)

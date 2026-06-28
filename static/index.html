@@ -414,6 +414,7 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
               <div class="search-box" style="flex:1;min-width:160px">🔍 <input type="text" id="order-search" placeholder="Mijoz, telefon..." oninput="filterOrders()"></div>
               <input type="date" id="orders-date" class="filter-btn" style="cursor:pointer;font-size:12px;" onchange="loadOrders()">
               <button class="filter-btn" onclick="setTodayOrders()" style="white-space:nowrap">📅 Bugun</button>
+              <button class="filter-btn" onclick="loadUndelivered()" style="white-space:nowrap;background:rgba(239,68,68,.1);border-color:var(--red);color:var(--red);" id="undelivered-btn">⚠️ Yetkazilmagan</button>
             </div>
             <div class="filter-row">
               <button class="filter-btn active" onclick="setFilter('all',this)">Hammasi</button>
@@ -883,6 +884,22 @@ function renderRecentOrders(orders) {
 }
 
 // ==================== ORDERS ====================
+async function loadUndelivered() {
+  document.getElementById('orders-body').innerHTML = '<tr><td colspan="7"><div class="loader"><div class="spinner"></div></div></td></tr>';
+  const orders = await api('/api/orders/undelivered');
+  if (!orders) return;
+  allOrders = orders;
+  updatePendingBadge();
+  // Clear date filter to show all
+  document.getElementById('orders-date').value = '';
+  currentFilter = 'all';
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('undelivered-btn').classList.add('active');
+  renderOrders();
+  if (orders.length === 0) showToast('Yetkazilmagan buyurtma yo'q!', 'success');
+  else showToast(`${orders.length} ta yetkazilmagan buyurtma`, 'info');
+}
+
 function setTodayOrders() {
   document.getElementById('orders-date').value = new Date().toISOString().split('T')[0];
   loadOrders();
