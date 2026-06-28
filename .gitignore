@@ -16,3 +16,6 @@ __pycache__/
 .idea/
 .tmp.driveupload/
 *.tmp
+*.pptx
+~$*
+CLAUDE.md
