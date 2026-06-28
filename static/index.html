@@ -896,8 +896,8 @@ async function loadUndelivered() {
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('undelivered-btn').classList.add('active');
   renderOrders();
-  if (orders.length === 0) showToast('Yetkazilmagan buyurtma yo'q!', 'success');
-  else showToast(`${orders.length} ta yetkazilmagan buyurtma`, 'info');
+  if (orders.length === 0) showToast('Yetkazilmagan buyurtma yo’q!', 'success');
+  else showToast(orders.length + ' ta yetkazilmagan buyurtma', 'info');
 }
 
 function setTodayOrders() {
