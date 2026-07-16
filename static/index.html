@@ -677,11 +677,24 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
     <div class="modal-title" id="product-modal-title">Yangi mahsulot</div>
     <div class="form-group">
       <label class="form-label">Nomi</label>
-      <input type="text" class="form-input" id="prod-name" placeholder="Masalan: Qatiq">
+      <input type="text" class="form-input" id="prod-name" placeholder="Masalan: Qatiq" oninput="if(!document.getElementById('prod-image-url').value) updateImagePreview('', this.value)">
     </div>
     <div class="form-group">
       <label class="form-label">Narxi (so'm)</label>
       <input type="number" class="form-input" id="prod-price" placeholder="7000">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Mahsulot rasmi</label>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div id="prod-img-preview" style="width:64px;height:64px;border:1px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px;overflow:hidden;background:var(--surface2);flex-shrink:0;">
+          📷
+        </div>
+        <div style="flex:1;min-width:0;">
+          <input type="file" id="prod-file-input" style="display:none;" accept="image/*" onchange="uploadProductImage(this)">
+          <button class="action-btn" onclick="document.getElementById('prod-file-input').click()">Rasm tanlash</button>
+          <input type="text" class="form-input" id="prod-image-url" placeholder="Yoki rasm URL manzili..." style="margin-top:6px;font-size:11px;" oninput="updateImagePreview(this.value, document.getElementById('prod-name').value)">
+        </div>
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('product-modal')">Bekor</button>
@@ -1090,25 +1103,83 @@ async function loadProducts() {
   renderProducts();
 }
 
+function getEmoji(name) {
+  const emojis = { 'Qatiq':'🥛','Qaymoq':'🧈','Tvorog':'🧀','Malako':'🍼' };
+  for (const [k,v] of Object.entries(emojis)) if (name.toLowerCase().includes(k.toLowerCase())) return v;
+  return '🥛';
+}
+
 function renderProducts() {
   const g = document.getElementById('products-grid');
   if (!allProducts.length) { g.innerHTML = '<div class="empty-state"><div class="emoji">🧀</div><p>Mahsulotlar yo\'q</p></div>'; return; }
-  g.innerHTML = allProducts.map(p => `
-    <div class="product-card">
-      <div class="product-name">${esc(p.name)}</div>
-      <div class="product-price">${fmtMoney(p.price)} <small>so'm</small></div>
-      <div class="product-status" style="margin-top:10px;display:flex;align-items:center;gap:6px;">
-        <label class="toggle-switch">
-          <input type="checkbox" ${p.is_active ? 'checked' : ''} onchange="toggleProduct(${p.id}, this.checked)">
-          <span class="toggle-slider"></span>
-        </label>
-        <span class="toggle-label">${p.is_active ? 'Faol' : 'Nofaol'}</span>
+  g.innerHTML = allProducts.map(p => {
+    const imgHtml = p.image_url 
+      ? `<img src="${esc(p.image_url)}" style="width:100%;height:120px;object-fit:cover;border-radius:8px;margin-bottom:8px;" onerror="this.outerHTML='<div style=\\'width:100%;height:120px;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--surface2);border-radius:8px;margin-bottom:8px;\\'>${getEmoji(p.name)}</div>'">`
+      : `<div style="width:100%;height:120px;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--surface2);border-radius:8px;margin-bottom:8px;">${getEmoji(p.name)}</div>`;
+    return `
+      <div class="product-card">
+        ${imgHtml}
+        <div class="product-name">${esc(p.name)}</div>
+        <div class="product-price">${fmtMoney(p.price)} <small>so'm</small></div>
+        <div class="product-status" style="margin-top:10px;display:flex;align-items:center;gap:6px;">
+          <label class="toggle-switch">
+            <input type="checkbox" ${p.is_active ? 'checked' : ''} onchange="toggleProduct(${p.id}, this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="toggle-label">${p.is_active ? 'Faol' : 'Nofaol'}</span>
+        </div>
+        <div class="product-actions">
+          <button class="action-btn primary" onclick="openEditProduct(${p.id})">✏️ Tahrirlash</button>
+        </div>
       </div>
-      <div class="product-actions">
-        <button class="action-btn primary" onclick="openEditProduct(${p.id})">✏️ Tahrirlash</button>
-      </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
+}
+
+function updateImagePreview(url, productName = '') {
+  const preview = document.getElementById('prod-img-preview');
+  if (url) {
+    preview.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;" onerror="this.innerHTML='📷'">`;
+  } else {
+    let emoji = '📷';
+    if (productName) {
+      emoji = getEmoji(productName);
+    }
+    preview.innerHTML = emoji;
+  }
+}
+
+async function uploadProductImage(input) {
+  const file = input.files[0];
+  if (!file) return;
+  
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const preview = document.getElementById('prod-img-preview');
+  preview.innerHTML = '<span style="font-size:10px;">Yuklanyapti...</span>';
+  
+  try {
+    const response = await fetch(BASE + '/api/upload', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + TOKEN
+      },
+      body: formData
+    });
+    const result = await response.json();
+    if (response.ok && result.url) {
+      document.getElementById('prod-image-url').value = result.url;
+      updateImagePreview(result.url);
+      showToast('Rasm muvaffaqiyatli yuklandi!', 'success');
+    } else {
+      updateImagePreview('', document.getElementById('prod-name').value);
+      showToast(result.error || 'Rasm yuklashda xatolik', 'error');
+    }
+  } catch (err) {
+    updateImagePreview('', document.getElementById('prod-name').value);
+    showToast('Server bilan bog\'lanishda xatolik', 'error');
+  }
 }
 
 function openAddProduct() {
@@ -1116,6 +1187,9 @@ function openAddProduct() {
   document.getElementById('product-modal-title').textContent = 'Yangi mahsulot';
   document.getElementById('prod-name').value = '';
   document.getElementById('prod-price').value = '';
+  document.getElementById('prod-image-url').value = '';
+  document.getElementById('prod-file-input').value = '';
+  updateImagePreview('');
   document.getElementById('product-modal').classList.add('open');
 }
 
@@ -1126,18 +1200,22 @@ function openEditProduct(id) {
   document.getElementById('product-modal-title').textContent = 'Mahsulotni tahrirlash';
   document.getElementById('prod-name').value = p.name;
   document.getElementById('prod-price').value = p.price;
+  document.getElementById('prod-image-url').value = p.image_url || '';
+  document.getElementById('prod-file-input').value = '';
+  updateImagePreview(p.image_url || '', p.name);
   document.getElementById('product-modal').classList.add('open');
 }
 
 async function saveProduct() {
   const name = document.getElementById('prod-name').value.trim();
   const price = parseFloat(document.getElementById('prod-price').value);
+  const image_url = document.getElementById('prod-image-url').value.trim() || null;
   if (!name || isNaN(price) || price <= 0) { showToast('Iltimos, barcha maydonlarni to\'ldiring', 'error'); return; }
   let r;
   if (editingProductId) {
-    r = await api(`/api/products/${editingProductId}`, 'PUT', { name, price });
+    r = await api(`/api/products/${editingProductId}`, 'PUT', { name, price, image_url });
   } else {
-    r = await api('/api/products', 'POST', { name, price });
+    r = await api('/api/products', 'POST', { name, price, image_url });
   }
   if (r?.success || r?.id || r?.product) {
     showToast(editingProductId ? 'Mahsulot yangilandi!' : 'Mahsulot qo\'shildi!', 'success');

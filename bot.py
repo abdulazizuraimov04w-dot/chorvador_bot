@@ -197,6 +197,10 @@ async def api_get_products(request):
         logger.error(f"api_get_products: {e}")
         return web.json_response({"error": str(e)}, status=500)
 
+
+
+
+
 async def api_add_product(request):
     if not is_authorized(request):
         return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
@@ -206,9 +210,10 @@ async def api_add_product(request):
         data = await request.json()
         name = data.get("name", "").strip()
         price = data.get("price")
+        image_url = data.get("image_url")
         if not name or price is None:
             return web.json_response({"error": "Nom va narx kiritilishi shart!"}, status=400)
-        product = await models.add_product(name, Decimal(str(price)))
+        product = await models.add_product(name, Decimal(str(price)), image_url)
         product['price'] = float(product['price'])
         if product.get('created_at'):
             product['created_at'] = product['created_at'].strftime("%Y-%m-%d %H:%M")
@@ -223,17 +228,16 @@ async def api_update_product(request):
         return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
     try:
         from decimal import Decimal
-        from database.connection import execute_query
         from database import models
         product_id = int(request.match_info['id'])
         data = await request.json()
         name = data.get("name", "").strip()
         price = data.get("price")
+        image_url = data.get("image_url")
         if not name or price is None:
             return web.json_response({"error": "Nom va narx kiritilishi shart!"}, status=400)
-        await execute_query("UPDATE products SET name = $1 WHERE id = $2;", name, product_id)
-        await models.update_product_price(product_id, Decimal(str(price)))
-        logger.info(f"Mahsulot #{product_id} yangilandi: {name}, {price}")
+        await models.update_product(product_id, name, Decimal(str(price)), image_url)
+        logger.info(f"Mahsulot #{product_id} yangilandi: {name}, {price}, {image_url}")
         return web.json_response({"success": True})
     except Exception as e:
         logger.error(f"api_update_product: {e}")
@@ -647,6 +651,9 @@ async def main():
     register_routers(dp)
 
     try:
+        from database import models
+        await init_db_pool()
+        await models.create_tables()
         await start_web_server()
     except Exception as e:
         logger.error(f"Web server xatosi: {e}")
@@ -657,6 +664,12 @@ async def main():
         await dp.start_polling(bot)
     except Exception as e:
         logger.critical(f"Bot xatosi: {e}")
+        logger.info("Web serverni ochiq qoldirish uchun kutish rejimiga o'tilmoqda...")
+        try:
+            while True:
+                await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            pass
     finally:
         await bot.session.close()
 
