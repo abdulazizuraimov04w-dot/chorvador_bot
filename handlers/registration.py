@@ -1,7 +1,7 @@
 import os
 from aiogram import Router, F
 from aiogram.filters import CommandStart
-from aiogram.types import Message, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.types import Message, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
 from dotenv import load_dotenv
 
@@ -133,23 +133,10 @@ async def process_location(message: Message, state: FSMContext):
             is_admin=is_admin
         )
         
-        # Send main menu reply keyboard first so the customer has it permanently
         await message.answer(
-            "Sut mahsulotlarini yetkazib berish xizmatiga xush kelibsiz. 🌅🥛",
+            "Tabriklaymiz! Ro'yxatdan o'tish muvaffaqiyatli yakunlandi.\n"
+            "Siz endi sut mahsulotlariga buyurtma berishingiz mumkin.",
             reply_markup=keyboards.get_main_menu_keyboard(is_admin=is_admin)
-        )
-        
-        # Then send the welcome message with the inline miniapp button
-        base_url = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
-        miniapp_url = f"{base_url}/miniapp"
-        inline_keyboard = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="🛒 Buyurtma berish", web_app=WebAppInfo(url=miniapp_url))
-        ]])
-        
-        await message.answer(
-            f"Assalomu alaykum hurmatli {full_name}!\n"
-            "Ro'yxatdan o'tish muvaffaqiyatli yakunlandi. Quyidagi tugmani bosish orqali buyurtma berishingiz mumkin:",
-            reply_markup=inline_keyboard
         )
         await state.clear()
         
