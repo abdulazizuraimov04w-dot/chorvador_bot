@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Sut Mahsulotlari</title>
+<title>Chorvador</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 :root {
@@ -23,7 +23,70 @@
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--text); min-height:100vh; overflow-x:hidden; }
 
-/* PAGES */
+/* ============================================================
+   SPLASH SCREEN
+   ============================================================ */
+#splash {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+#splash.hide {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+#splash-logo {
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+  animation: splashPop 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+@keyframes splashPop {
+  0%   { transform: scale(0.5); opacity: 0; }
+  100% { transform: scale(1);   opacity: 1; }
+}
+#splash-tagline {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  animation: fadeUp 0.5s 0.2s ease both;
+}
+#splash-dots {
+  margin-top: 32px;
+  display: flex;
+  gap: 7px;
+  animation: fadeUp 0.4s 0.35s ease both;
+}
+#splash-dots span {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: dotBounce 1s infinite;
+}
+#splash-dots span:nth-child(2) { animation-delay: 0.15s; }
+#splash-dots span:nth-child(3) { animation-delay: 0.30s; }
+@keyframes dotBounce {
+  0%,80%,100% { transform: scale(0.8); opacity: 0.5; }
+  40%          { transform: scale(1.2); opacity: 1;   }
+}
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(10px); }
+  to   { opacity:1; transform:translateY(0);    }
+}
+
+/* ============================================================
+   PAGES
+   ============================================================ */
 .page { display:none; min-height:100vh; padding-bottom:80px; }
 .page.active { display:block; }
 
@@ -41,21 +104,28 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .bottomnav-item .icon { font-size:22px; }
 .nav-badge { position:absolute; top:6px; right:calc(50% - 18px); background:var(--red); color:#fff; font-size:9px; font-weight:900; padding:1px 5px; border-radius:10px; }
 
-/* CATALOG */
-.catalog-header { padding:16px; }
+/* CATALOG GRID */
+.catalog-header { padding:16px 16px 8px; }
 .catalog-header h2 { font-size:20px; font-weight:800; }
 .catalog-header p { font-size:13px; color:var(--muted); margin-top:2px; }
-.products-list { padding:0 16px; display:flex; flex-direction:column; gap:12px; }
-.product-card { background:var(--surface); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); display:flex; align-items:center; gap:14px; }
-.product-info { flex:1; }
-.product-name { font-size:15px; font-weight:700; }
-.product-price { font-size:16px; font-weight:800; color:var(--accent); margin-top:2px; }
-.product-price small { font-size:11px; color:var(--muted); font-weight:400; }
-.qty-control { display:flex; align-items:center; gap:8px; flex-shrink:0; }
-.qty-btn { width:32px; height:32px; border-radius:50%; border:none; font-size:20px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:.15s; }
+
+.products-grid { padding:8px 12px 16px; display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+.product-card { background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow); display:flex; flex-direction:column; overflow:hidden; }
+.product-img-wrap { width:100%; aspect-ratio:1/1; background:var(--bg); overflow:hidden; flex-shrink:0; }
+.product-img { width:100%; height:100%; object-fit:cover; display:block; }
+.product-img-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:52px; background:linear-gradient(135deg,#f0f4f8,#e8eaf0); }
+.product-body { padding:10px 10px 12px; display:flex; flex-direction:column; gap:6px; flex:1; }
+.product-name { font-size:13px; font-weight:700; line-height:1.3; }
+.product-price { font-size:14px; font-weight:800; color:var(--accent); }
+.product-price small { font-size:10px; color:var(--muted); font-weight:400; }
+.qty-control { display:flex; align-items:center; justify-content:space-between; gap:4px; margin-top:4px; }
+.qty-btn { width:30px; height:30px; border-radius:50%; border:none; font-size:18px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:.15s; flex-shrink:0; }
 .qty-minus { background:#ffeaea; color:var(--red); }
-.qty-plus { background:#e8f8ef; color:var(--accent); }
-.qty-num { font-size:16px; font-weight:800; min-width:24px; text-align:center; }
+.qty-plus  { background:#e8f8ef; color:var(--accent); }
+.qty-num   { font-size:15px; font-weight:800; min-width:22px; text-align:center; }
+.add-btn { width:100%; padding:8px 0; background:var(--accent); color:#fff; border:none; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer; transition:.15s; margin-top:4px; }
+.add-btn:active { transform:scale(0.97); }
 
 /* CART */
 .cart-empty { text-align:center; padding:60px 24px; }
@@ -63,11 +133,12 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .cart-empty p { color:var(--muted); font-size:15px; }
 .cart-items { padding:16px; display:flex; flex-direction:column; gap:10px; }
 .cart-item { background:var(--surface); border-radius:var(--radius); padding:14px 16px; box-shadow:var(--shadow); display:flex; align-items:center; gap:12px; }
-.cart-item-emoji { font-size:30px; }
-.cart-item-info { flex:1; }
-.cart-item-name { font-size:14px; font-weight:700; }
+.cart-item-img { width:52px; height:52px; border-radius:10px; object-fit:cover; background:var(--bg); flex-shrink:0; }
+.cart-item-img-placeholder { width:52px; height:52px; border-radius:10px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:28px; flex-shrink:0; }
+.cart-item-info { flex:1; min-width:0; }
+.cart-item-name { font-size:14px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .cart-item-price { font-size:12px; color:var(--muted); margin-top:2px; }
-.cart-item-total { font-size:15px; font-weight:800; color:var(--accent); }
+.cart-item-total { font-size:15px; font-weight:800; color:var(--accent); white-space:nowrap; }
 .cart-summary { margin:0 16px; background:var(--surface); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); }
 .summary-row { display:flex; justify-content:space-between; padding:6px 0; font-size:14px; }
 .summary-row.total { border-top:1px solid var(--border); margin-top:6px; padding-top:12px; font-weight:800; font-size:16px; }
@@ -107,7 +178,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .order-card-footer { display:flex; justify-content:space-between; align-items:center; }
 .order-card-price { font-size:16px; font-weight:800; color:var(--accent); }
 .status-pill { padding:4px 10px; border-radius:20px; font-size:11px; font-weight:700; }
-.pill-pending { background:#fef9e7; color:var(--yellow); }
+.pill-pending   { background:#fef9e7; color:var(--yellow); }
 .pill-confirmed { background:#e8f4fd; color:var(--accent2); }
 .pill-completed { background:#e8f8ef; color:var(--accent-dark); }
 .pill-cancelled { background:#fdecea; color:var(--red); }
@@ -140,6 +211,17 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 </head>
 <body>
 
+<!-- ============================================================
+     SPLASH SCREEN
+     ============================================================ -->
+<div id="splash">
+  <img id="splash-logo" src="data:image/jpeg;base64,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stPeLeyqZTVHFwCpgdDJ7Li07scARzBWUREBERAREQEREBERAREQEREBERAREQEREBERARN0QEREBYA4DjJys5c6z0z76WCMVr+Jz2gN4fZBOzTty3AB2WfRAREQAiIgIiICJ0RAWp5RpRheZXBtxvlgpqqtDQw1DXPikc0dGucxzS4eh3W2Ig6FjsNrxq2Q2uzUFPQUUA2jggYGtb5/E+J6ld9EQEREDr1WPseP2vGqI0Fpo46SmMskxjYSRxvcXOPMnqSSsgiAiIgIiICIiAmyIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAm/NEQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBPBEQEREBERARE5IBREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAToiICIiAiIgIi5QcIiICIiAiIg/9k=" alt="Chorvador">
+  <div id="splash-tagline">Toza sut mahsulotlari</div>
+  <div id="splash-dots">
+    <span></span><span></span><span></span>
+  </div>
+</div>
+
 <!-- CATALOG PAGE -->
 <div class="page active" id="page-catalog">
   <div class="topnav">
@@ -152,8 +234,8 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
     <h2>Sut mahsulotlari</h2>
     <p>Toza va sifatli, har kuni yetkazib beramiz</p>
   </div>
-  <div class="products-list" id="products-list">
-    <div class="loader"><div class="spinner"></div> Yuklanmoqda...</div>
+  <div class="products-grid" id="products-list">
+    <div class="loader" style="grid-column:1/-1"><div class="spinner"></div> Yuklanmoqda...</div>
   </div>
 </div>
 
@@ -176,8 +258,6 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
     <div></div>
   </div>
   <div class="order-form">
-
-    <!-- Delivery date -->
     <div class="form-section">
       <div class="form-section-title">📅 Yetkazish kuni</div>
       <div class="option-grid">
@@ -189,33 +269,23 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
         </button>
       </div>
     </div>
-
-    <!-- Delivery time -->
     <div class="form-section">
       <div class="form-section-title">⏰ Yetkazish vaqti</div>
       <div class="option-grid-3">
         <button class="time-btn selected" id="time-morning" onclick="selectTime('morning')">
-          <span class="time-icon">🌅</span>
-          Ertalab
-          <span class="time-range">06:00–07:00</span>
+          <span class="time-icon">🌅</span>Ertalab<span class="time-range">06:00–07:00</span>
         </button>
         <button class="time-btn" id="time-noon" onclick="selectTime('noon')">
-          <span class="time-icon">☀️</span>
-          Kunduz
-          <span class="time-range">12:00–13:00</span>
+          <span class="time-icon">☀️</span>Kunduz<span class="time-range">12:00–13:00</span>
         </button>
         <button class="time-btn" id="time-evening" onclick="selectTime('evening')">
-          <span class="time-icon">🌆</span>
-          Kechqurun
-          <span class="time-range">18:00–19:00</span>
+          <span class="time-icon">🌆</span>Kechqurun<span class="time-range">18:00–19:00</span>
         </button>
       </div>
     </div>
-
-    <!-- Location -->
     <div class="form-section">
       <div class="form-section-title">📍 Yetkazish manzili</div>
-      <div class="location-box" id="location-box">
+      <div class="location-box">
         <div class="location-icon">📍</div>
         <div class="location-text">
           <div class="location-name" id="location-name">Saqlangan manzil ishlatiladi</div>
@@ -224,13 +294,10 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
         <button class="location-change" onclick="requestLocation()">O'zgartirish</button>
       </div>
     </div>
-
-    <!-- Order summary -->
     <div class="form-section">
       <div class="form-section-title">🧾 Buyurtma tarkibi</div>
       <div class="order-items-preview" id="order-preview"></div>
     </div>
-
   </div>
   <button class="main-btn" id="confirm-btn" onclick="confirmOrder()">✅ Tasdiqlash</button>
 </div>
@@ -277,27 +344,33 @@ const tg = window.Telegram.WebApp;
 tg.ready();
 tg.expand();
 
-// Colors from Telegram theme
-document.documentElement.style.setProperty('--tg-bg', tg.themeParams.bg_color || '#f5f6fa');
+// ============================================================
+// SPLASH — mahsulotlar yuklanib bo'lgach yashirish
+// ============================================================
+function hideSplash() {
+  const splash = document.getElementById('splash');
+  splash.classList.add('hide');
+  setTimeout(() => splash.remove(), 450);
+}
 
 // ============================================================
 // STATE
 // ============================================================
-const BASE_URL = '%%BASE_URL%%'; // bot.py da to'ldiriladi
-let TOKEN = '%%API_TOKEN%%';    // bot.py da to'ldiriladi
+const BASE_URL = '%%BASE_URL%%';
+let TOKEN = '%%API_TOKEN%%';
 let USER_TG_ID = tg.initDataUnsafe?.user?.id || null;
 
 let products = [];
-let cart = {}; // { product_id: quantity }
-let selectedDay = 'today';
+let cart = {};
+let selectedDay  = 'today';
 let selectedTime = 'morning';
-let userLocation = null; // { lat, lon } — agar yangi tanlasa
-let currentPage = 'catalog';
+let userLocation = null;
+let currentPage  = 'catalog';
 
 const TIME_MAP = {
-  morning: { start: '06:00', end: '07:00' },
-  noon:    { start: '12:00', end: '13:00' },
-  evening: { start: '18:00', end: '19:00' }
+  morning: { start:'06:00', end:'07:00' },
+  noon:    { start:'12:00', end:'13:00' },
+  evening: { start:'18:00', end:'19:00' }
 };
 
 // ============================================================
@@ -310,12 +383,9 @@ function goPage(page) {
   const navEl = document.getElementById('nav-' + page);
   if (navEl) navEl.classList.add('active');
   currentPage = page;
-
-  if (page === 'cart') renderCart();
-  if (page === 'order') renderOrderForm();
+  if (page === 'cart')   renderCart();
+  if (page === 'order')  renderOrderForm();
   if (page === 'orders') loadOrders();
-
-  // Back button
   tg.BackButton[['cart','order'].includes(page) ? 'show' : 'hide']();
 }
 
@@ -334,174 +404,164 @@ async function apiFetch(path, method='GET', body=null) {
   try {
     const r = await fetch(BASE_URL + path, opts);
     return await r.json();
-  } catch (e) {
-    console.error('API error:', e);
-    return null;
-  }
+  } catch(e) { console.error('API error:', e); return null; }
 }
 
 // ============================================================
-// CATALOG
+// CATALOG — GRID
 // ============================================================
 async function loadProducts() {
   const data = await apiFetch('/api/products');
+  // Splash minimun 1.2 sekund ko'rinsin, keyin mahsulotlar bilan birga yo'qolsin
+  const minDelay = new Promise(r => setTimeout(r, 1200));
+  await minDelay;
+  hideSplash();
   if (!data) { showToast('Xatolik yuz berdi'); return; }
   products = Array.isArray(data) ? data.filter(p => p.is_active) : [];
   renderProducts();
 }
 
-const EMOJIS = { 'Qatiq':'🥛', 'Qaymoq':'🧈', 'Tvorog':'🧀', 'Malako':'🍼' };
+const EMOJIS = { 'Qatiq':'🥛','Qaymoq':'🧈','Tvorog':'🧀','Malako':'🍼' };
 function getEmoji(name) {
-  for (const [k, v] of Object.entries(EMOJIS)) if (name.toLowerCase().includes(k.toLowerCase())) return v;
+  for (const [k,v] of Object.entries(EMOJIS)) if (name.toLowerCase().includes(k.toLowerCase())) return v;
   return '🥛';
+}
+
+function productImgHtml(p) {
+  if (p.image_url) {
+    return `<img class="product-img" src="${esc(p.image_url)}" alt="${esc(p.name)}"
+              onerror="this.parentElement.innerHTML='<div class=\\'product-img-placeholder\\'>${getEmoji(p.name)}</div>'">`;
+  }
+  return `<div class="product-img-placeholder">${getEmoji(p.name)}</div>`;
 }
 
 function renderProducts() {
   const list = document.getElementById('products-list');
-  if (!products.length) { list.innerHTML = '<div class="loader">Mahsulotlar yo\'q</div>'; return; }
-  list.innerHTML = products.map(p => `
-    <div class="product-card">
-      
-      <div class="product-info">
-        <div class="product-name">${esc(p.name)}</div>
-        <div class="product-price">${fmtPrice(p.price)} <small>so'm</small></div>
-      </div>
-      <div class="qty-control">
-        <button class="qty-btn qty-minus" onclick="changeQty(${p.id}, -1)">−</button>
-        <div class="qty-num" id="qty-${p.id}">${cart[p.id] || 0}</div>
-        <button class="qty-btn qty-plus" onclick="changeQty(${p.id}, 1)">+</button>
-      </div>
-    </div>
-  `).join('');
+  if (!products.length) {
+    list.innerHTML = '<div class="loader" style="grid-column:1/-1">Mahsulotlar yo\'q</div>';
+    return;
+  }
+  list.innerHTML = products.map(p => {
+    const qty = cart[p.id] || 0;
+    return `
+      <div class="product-card">
+        <div class="product-img-wrap">${productImgHtml(p)}</div>
+        <div class="product-body">
+          <div class="product-name">${esc(p.name)}</div>
+          <div class="product-price">${fmtPrice(p.price)} <small>so'm</small></div>
+          <div id="ctrl-${p.id}">${qty === 0 ? addBtnHtml(p.id) : qtyCtrlHtml(p.id, qty)}</div>
+        </div>
+      </div>`;
+  }).join('');
 }
 
-function changeQty(id, delta) {
-  const cur = cart[id] || 0;
-  const next = Math.max(0, cur + delta);
-  if (next === 0) delete cart[id]; else cart[id] = next;
-  const el = document.getElementById('qty-' + id);
-  if (el) el.textContent = next;
-  updateCartBadge();
-}
+function addBtnHtml(id)     { return `<button class="add-btn" onclick="addToCart(${id})">+ Savatga</button>`; }
+function qtyCtrlHtml(id,qty){ return `<div class="qty-control"><button class="qty-btn qty-minus" onclick="changeQty(${id},-1)">−</button><div class="qty-num" id="qty-${id}">${qty}</div><button class="qty-btn qty-plus" onclick="changeQty(${id},1)">+</button></div>`; }
 
+function addToCart(id)  { cart[id]=1; refreshCtrl(id); updateCartBadge(); }
+function changeQty(id,delta) {
+  const next = Math.max(0,(cart[id]||0)+delta);
+  if(next===0) delete cart[id]; else cart[id]=next;
+  refreshCtrl(id); updateCartBadge();
+}
+function refreshCtrl(id) {
+  const w = document.getElementById('ctrl-'+id);
+  if(!w) return;
+  const qty = cart[id]||0;
+  w.innerHTML = qty===0 ? addBtnHtml(id) : qtyCtrlHtml(id,qty);
+}
 function updateCartBadge() {
-  const total = Object.values(cart).reduce((s, v) => s + v, 0);
+  const total = Object.values(cart).reduce((s,v)=>s+v,0);
   document.getElementById('cart-count-top').textContent = total;
   document.getElementById('nav-cart-badge').textContent = total;
-  document.getElementById('cart-count-top').parentElement.style.display = total > 0 ? 'flex' : 'none';
-  document.getElementById('nav-cart-badge').style.display = total > 0 ? '' : 'none';
+  document.getElementById('cart-topbtn').style.display = total>0 ? 'flex' : 'none';
+  document.getElementById('nav-cart-badge').style.display = total>0 ? '' : 'none';
 }
 
 // ============================================================
 // CART
 // ============================================================
 function getCartItems() {
-  return products.filter(p => cart[p.id] > 0).map(p => ({
-    ...p, quantity: cart[p.id], subtotal: p.price * cart[p.id]
-  }));
+  return products.filter(p=>cart[p.id]>0).map(p=>({...p,quantity:cart[p.id],subtotal:p.price*cart[p.id]}));
 }
-
+function cartItemImgHtml(p) {
+  if(p.image_url) return `<img class="cart-item-img" src="${esc(p.image_url)}" alt="${esc(p.name)}" onerror="this.outerHTML='<div class=\\'cart-item-img-placeholder\\'>${getEmoji(p.name)}</div>'">`;
+  return `<div class="cart-item-img-placeholder">${getEmoji(p.name)}</div>`;
+}
 function renderCart() {
   const items = getCartItems();
   const content = document.getElementById('cart-content');
-  const btn = document.getElementById('cart-order-btn');
-
+  const btn     = document.getElementById('cart-order-btn');
   if (!items.length) {
     content.innerHTML = `<div class="cart-empty"><div class="emoji">🛒</div><p>Savatcha bo'sh<br>Katalogdan mahsulot tanlang</p></div>`;
-    btn.disabled = true;
-    btn.textContent = 'Mahsulot tanlang';
-    return;
+    btn.disabled=true; btn.textContent='Mahsulot tanlang'; return;
   }
-
-  const total = items.reduce((s, i) => s + i.subtotal, 0);
+  const total = items.reduce((s,i)=>s+i.subtotal,0);
   content.innerHTML = `
     <div class="cart-items">
-      ${items.map(i => `
+      ${items.map(i=>`
         <div class="cart-item">
-          <div class="cart-item-emoji">${getEmoji(i.name)}</div>
+          ${cartItemImgHtml(i)}
           <div class="cart-item-info">
             <div class="cart-item-name">${esc(i.name)}</div>
             <div class="cart-item-price">${fmtPrice(i.price)} so'm × ${i.quantity}</div>
           </div>
-          <div class="qty-control">
-            <button class="qty-btn qty-minus" onclick="changeQty(${i.id},-1);renderCart()">−</button>
-            <div class="qty-num">${i.quantity}</div>
-            <button class="qty-btn qty-plus" onclick="changeQty(${i.id},1);renderCart()">+</button>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+            <div class="cart-item-total">${fmtPrice(i.subtotal)} so'm</div>
+            <div class="qty-control">
+              <button class="qty-btn qty-minus" onclick="changeQtyCart(${i.id},-1)">−</button>
+              <div class="qty-num">${i.quantity}</div>
+              <button class="qty-btn qty-plus" onclick="changeQtyCart(${i.id},1)">+</button>
+            </div>
           </div>
-        </div>
-      `).join('')}
+        </div>`).join('')}
     </div>
     <div class="cart-summary">
-      ${items.map(i => `<div class="summary-row"><span>${esc(i.name)} × ${i.quantity}</span><span>${fmtPrice(i.subtotal)} so'm</span></div>`).join('')}
+      ${items.map(i=>`<div class="summary-row"><span>${esc(i.name)} × ${i.quantity}</span><span>${fmtPrice(i.subtotal)} so'm</span></div>`).join('')}
       <div class="summary-row total"><span>Jami</span><span class="val">${fmtPrice(total)} so'm</span></div>
-    </div>
-  `;
-  btn.disabled = false;
-  btn.textContent = `Buyurtma berish → ${fmtPrice(total)} so'm`;
+    </div>`;
+  btn.disabled=false; btn.textContent=`Buyurtma berish → ${fmtPrice(total)} so'm`;
 }
+function changeQtyCart(id,delta){ changeQty(id,delta); renderCart(); }
 
 // ============================================================
 // ORDER FORM
 // ============================================================
 function renderOrderForm() {
-  // Set day labels
-  const today = new Date();
-  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
-  document.getElementById('today-label').textContent = formatDateLabel(today);
+  const today=new Date(), tomorrow=new Date(today); tomorrow.setDate(today.getDate()+1);
+  document.getElementById('today-label').textContent    = formatDateLabel(today);
   document.getElementById('tomorrow-label').textContent = formatDateLabel(tomorrow);
-
-  // Order preview
-  const items = getCartItems();
-  const total = items.reduce((s, i) => s + i.subtotal, 0);
+  const items=getCartItems(), total=items.reduce((s,i)=>s+i.subtotal,0);
   document.getElementById('order-preview').innerHTML = `
-    ${items.map(i => `<div class="order-preview-row"><span>${getEmoji(i.name)} ${esc(i.name)} × ${i.quantity}</span><span>${fmtPrice(i.subtotal)} so'm</span></div>`).join('')}
-    <div class="order-preview-total"><span>Jami to'lov</span><span class="val">${fmtPrice(total)} so'm</span></div>
-  `;
-
-  // Location
-  if (userLocation) {
-    document.getElementById('location-name').textContent = 'Yangi manzil tanlandi';
+    ${items.map(i=>`<div class="order-preview-row"><span>${getEmoji(i.name)} ${esc(i.name)} × ${i.quantity}</span><span>${fmtPrice(i.subtotal)} so'm</span></div>`).join('')}
+    <div class="order-preview-total"><span>Jami to'lov</span><span class="val">${fmtPrice(total)} so'm</span></div>`;
+  if(userLocation){
+    document.getElementById('location-name').textContent  = 'Yangi manzil tanlandi';
     document.getElementById('location-coords').textContent = `${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}`;
   }
-
-  // Confirm button
-  const btn = document.getElementById('confirm-btn');
-  btn.textContent = `✅ Tasdiqlash — ${fmtPrice(total)} so'm`;
+  document.getElementById('confirm-btn').textContent = `✅ Tasdiqlash — ${fmtPrice(total)} so'm`;
 }
-
 function selectDay(day) {
-  selectedDay = day;
-  document.getElementById('day-today').classList.toggle('selected', day === 'today');
-  document.getElementById('day-tomorrow').classList.toggle('selected', day === 'tomorrow');
+  selectedDay=day;
+  document.getElementById('day-today').classList.toggle('selected',day==='today');
+  document.getElementById('day-tomorrow').classList.toggle('selected',day==='tomorrow');
 }
-
 function selectTime(time) {
-  selectedTime = time;
-  ['morning','noon','evening'].forEach(t => {
-    document.getElementById('time-' + t).classList.toggle('selected', t === time);
-  });
+  selectedTime=time;
+  ['morning','noon','evening'].forEach(t=>document.getElementById('time-'+t).classList.toggle('selected',t===time));
 }
-
 function requestLocation() {
-  tg.showPopup({
-    title: 'Manzil',
-    message: 'Joriy joylashuvingizni aniqlaylikmi?',
-    buttons: [
-      { id: 'yes', type: 'default', text: 'Ha, aniqlash' },
-      { id: 'no', type: 'cancel', text: 'Yo\'q' }
-    ]
-  }, (btnId) => {
-    if (btnId !== 'yes') return;
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        pos => {
-          userLocation = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-          document.getElementById('location-name').textContent = 'Joriy joylashuv';
-          document.getElementById('location-coords').textContent = `${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}`;
-          showToast('📍 Manzil yangilandi!');
-        },
-        () => showToast('Manzilni aniqlab bo\'lmadi')
-      );
+  tg.showPopup({title:'Manzil',message:'Joriy joylashuvingizni aniqlaylikmi?',
+    buttons:[{id:'yes',type:'default',text:'Ha, aniqlash'},{id:'no',type:'cancel',text:'Yo\'q'}]
+  },(btnId)=>{
+    if(btnId!=='yes') return;
+    if(navigator.geolocation){
+      navigator.geolocation.getCurrentPosition(pos=>{
+        userLocation={lat:pos.coords.latitude,lon:pos.coords.longitude};
+        document.getElementById('location-name').textContent  = 'Joriy joylashuv';
+        document.getElementById('location-coords').textContent = `${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}`;
+        showToast('📍 Manzil yangilandi!');
+      },()=>showToast('Manzilni aniqlab bo\'lmadi'));
     }
   });
 }
@@ -510,124 +570,88 @@ function requestLocation() {
 // CONFIRM ORDER
 // ============================================================
 async function confirmOrder() {
-  const btn = document.getElementById('confirm-btn');
-  btn.disabled = true;
-  btn.textContent = '⏳ Yuborilmoqda...';
-
-  const items = getCartItems();
-  if (!items.length) { showToast('Savatcha bo\'sh!'); btn.disabled = false; return; }
-
-  const today = new Date();
-  const deliveryDate = selectedDay === 'tomorrow'
-    ? new Date(today.setDate(today.getDate() + 1)).toISOString().split('T')[0]
+  const btn=document.getElementById('confirm-btn');
+  btn.disabled=true; btn.textContent='⏳ Yuborilmoqda...';
+  const items=getCartItems();
+  if(!items.length){ showToast('Savatcha bo\'sh!'); btn.disabled=false; return; }
+  const today=new Date();
+  const deliveryDate=selectedDay==='tomorrow'
+    ? new Date(today.setDate(today.getDate()+1)).toISOString().split('T')[0]
     : new Date().toISOString().split('T')[0];
-
-  const timeSlot = TIME_MAP[selectedTime];
-  const total = items.reduce((s, i) => s + i.subtotal, 0);
-
-  const payload = {
-    telegram_id: USER_TG_ID,
-    items: items.map(i => ({ product_id: i.id, quantity: i.quantity, price: i.price })),
-    total_price: total,
-    delivery_date: deliveryDate,
-    delivery_time_start: timeSlot.start,
-    delivery_time_end: timeSlot.end,
-    latitude: userLocation?.lat || null,
-    longitude: userLocation?.lon || null
+  const timeSlot=TIME_MAP[selectedTime];
+  const total=items.reduce((s,i)=>s+i.subtotal,0);
+  const payload={
+    telegram_id:USER_TG_ID,
+    items:items.map(i=>({product_id:i.id,quantity:i.quantity,price:i.price})),
+    total_price:total, delivery_date:deliveryDate,
+    delivery_time_start:timeSlot.start, delivery_time_end:timeSlot.end,
+    latitude:userLocation?.lat||null, longitude:userLocation?.lon||null
   };
-
-  const result = await apiFetch('/api/miniapp/order', 'POST', payload);
-
-  btn.disabled = false;
-  if (result?.success) {
-    // Show success
-    const dayLabel = selectedDay === 'today' ? 'Bugun' : 'Ertaga';
-    const timeLabel = { morning:'Ertalab 06:00–07:00', noon:'Kunduz 12:00–13:00', evening:'Kechqurun 18:00–19:00' }[selectedTime];
-    document.getElementById('success-detail').innerHTML = `
+  const result=await apiFetch('/api/miniapp/order','POST',payload);
+  btn.disabled=false;
+  if(result?.success){
+    const dayLabel=selectedDay==='today'?'Bugun':'Ertaga';
+    const timeLabel={morning:'Ertalab 06:00–07:00',noon:'Kunduz 12:00–13:00',evening:'Kechqurun 18:00–19:00'}[selectedTime];
+    document.getElementById('success-detail').innerHTML=`
       📅 <b>${dayLabel}</b>, ${timeLabel}<br>
-      📦 ${items.map(i => `${getEmoji(i.name)} ${i.name} × ${i.quantity}`).join('<br>')}<br>
-      💰 Jami: <b>${fmtPrice(total)} so'm</b>
-    `;
+      📦 ${items.map(i=>`${getEmoji(i.name)} ${i.name} × ${i.quantity}`).join('<br>')}<br>
+      💰 Jami: <b>${fmtPrice(total)} so'm</b>`;
     document.getElementById('success-screen').classList.add('show');
     tg.HapticFeedback.notificationOccurred('success');
-    cart = {};
-    updateCartBadge();
-    renderProducts();
+    cart={}; updateCartBadge(); renderProducts();
   } else {
-    showToast(result?.error || 'Xatolik yuz berdi. Qayta urinib ko\'ring.');
-    btn.textContent = `✅ Tasdiqlash — ${fmtPrice(total)} so'm`;
+    showToast(result?.error||'Xatolik yuz berdi. Qayta urinib ko\'ring.');
+    btn.textContent=`✅ Tasdiqlash — ${fmtPrice(total)} so'm`;
   }
 }
-
-function afterSuccess() {
-  document.getElementById('success-screen').classList.remove('show');
-  goPage('catalog');
-}
+function afterSuccess(){ document.getElementById('success-screen').classList.remove('show'); goPage('catalog'); }
 
 // ============================================================
 // ORDERS HISTORY
 // ============================================================
 async function loadOrders() {
-  document.getElementById('orders-content').innerHTML = '<div class="loader"><div class="spinner"></div> Yuklanmoqda...</div>';
-  if (!USER_TG_ID) {
-    document.getElementById('orders-content').innerHTML = '<div class="loader">Foydalanuvchi aniqlanmadi</div>';
+  document.getElementById('orders-content').innerHTML='<div class="loader"><div class="spinner"></div> Yuklanmoqda...</div>';
+  if(!USER_TG_ID){ document.getElementById('orders-content').innerHTML='<div class="loader">Foydalanuvchi aniqlanmadi</div>'; return; }
+  const data=await apiFetch(`/api/miniapp/orders/${USER_TG_ID}`);
+  if(!data||!data.length){
+    document.getElementById('orders-content').innerHTML=`<div class="cart-empty"><div class="emoji">📦</div><p>Hali buyurtma berilmagan</p></div>`;
     return;
   }
-  const data = await apiFetch(`/api/miniapp/orders/${USER_TG_ID}`);
-  if (!data || !data.length) {
-    document.getElementById('orders-content').innerHTML = `
-      <div class="cart-empty"><div class="emoji">📦</div><p>Hali buyurtma berilmagan</p></div>`;
-    return;
-  }
-  const statusMap = {
-    pending:   { text:'⏳ Kutmoqda',     cls:'pill-pending' },
-    confirmed: { text:'✅ Tasdiqlangan', cls:'pill-confirmed' },
-    completed: { text:'🚚 Yetkazildi',   cls:'pill-completed' },
-    cancelled: { text:'❌ Bekor',        cls:'pill-cancelled' }
+  const statusMap={
+    pending:{text:'⏳ Kutmoqda',cls:'pill-pending'},
+    confirmed:{text:'✅ Tasdiqlangan',cls:'pill-confirmed'},
+    completed:{text:'🚚 Yetkazildi',cls:'pill-completed'},
+    cancelled:{text:'❌ Bekor',cls:'pill-cancelled'}
   };
-  document.getElementById('orders-content').innerHTML = `
+  document.getElementById('orders-content').innerHTML=`
     <div class="orders-list">
-      ${data.map(o => {
-        const st = statusMap[o.status] || { text: o.status, cls:'pill-pending' };
-        const itemsText = (o.items||[]).filter(i=>i.product_name).map(i=>`${getEmoji(i.product_name)} ${i.product_name} × ${i.quantity}`).join('<br>');
-        return `
-          <div class="order-card">
-            <div class="order-card-header">
-              <div class="order-card-num">#${o.order_id}</div>
-              <span class="status-pill ${st.cls}">${st.text}</span>
-            </div>
-            <div class="order-card-items">${itemsText || '—'}</div>
-            <div class="order-card-footer">
-              <div class="order-card-price">${fmtPrice(o.total_price)} so'm</div>
-              <div class="order-card-date">${o.delivery_date}</div>
-            </div>
-            <div class="order-card-time">⏰ ${o.delivery_time_start} – ${o.delivery_time_end}</div>
-          </div>
-        `;
+      ${data.map(o=>{
+        const st=statusMap[o.status]||{text:o.status,cls:'pill-pending'};
+        const itemsText=(o.items||[]).filter(i=>i.product_name).map(i=>`${getEmoji(i.product_name)} ${i.product_name} × ${i.quantity}`).join('<br>');
+        return `<div class="order-card">
+          <div class="order-card-header"><div class="order-card-num">#${o.order_id}</div><span class="status-pill ${st.cls}">${st.text}</span></div>
+          <div class="order-card-items">${itemsText||'—'}</div>
+          <div class="order-card-footer"><div class="order-card-price">${fmtPrice(o.total_price)} so'm</div><div class="order-card-date">${o.delivery_date}</div></div>
+          <div class="order-card-time">⏰ ${o.delivery_time_start} – ${o.delivery_time_end}</div>
+        </div>`;
       }).join('')}
-    </div>
-  `;
+    </div>`;
 }
 
 // ============================================================
 // UTILS
 // ============================================================
-function fmtPrice(v) { return Number(v||0).toLocaleString('uz-UZ'); }
-function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function formatDateLabel(d) {
-  return d.toLocaleDateString('uz-UZ', { day:'numeric', month:'long' });
-}
+function fmtPrice(v)        { return Number(v||0).toLocaleString('uz-UZ'); }
+function esc(s)             { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function formatDateLabel(d) { return d.toLocaleDateString('uz-UZ',{day:'numeric',month:'long'}); }
 function showToast(msg) {
-  document.querySelectorAll('.toast').forEach(t => t.remove());
-  const t = document.createElement('div');
-  t.className = 'toast';
-  t.textContent = msg;
-  document.body.appendChild(t);
-  setTimeout(() => t.remove(), 2600);
+  document.querySelectorAll('.toast').forEach(t=>t.remove());
+  const t=document.createElement('div'); t.className='toast'; t.textContent=msg;
+  document.body.appendChild(t); setTimeout(()=>t.remove(),2600);
 }
 
 // ============================================================
-// INIT
+// INIT — splash bilan birga mahsulotlarni yuklash
 // ============================================================
 loadProducts();
 </script>

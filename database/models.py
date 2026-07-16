@@ -33,18 +33,24 @@ async def create_tables():
     """)
     
     # 3. products table
+    # ✅ YaNGI: image_url maydoni qo'shildi
     await execute_query("""
         CREATE TABLE IF NOT EXISTS products (
             id SERIAL PRIMARY KEY,
             name VARCHAR(150) NOT NULL UNIQUE,
             price NUMERIC(12, 2) NOT NULL,
+            image_url TEXT DEFAULT NULL,
             is_active BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMP DEFAULT NOW()
         );
     """)
+
+    # ✅ Agar jadval avval yaratilgan bo'lsa, image_url ustunini qo'shish (migration)
+    await execute_query("""
+        ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT NULL;
+    """)
     
     # 4. orders table
-    # status values: 'pending', 'confirmed', 'completed', 'cancelled'
     await execute_query("""
         CREATE TABLE IF NOT EXISTS orders (
             id SERIAL PRIMARY KEY,
@@ -69,7 +75,7 @@ async def create_tables():
         );
     """)
 
-    # 6. settings table — scheduler vaqti va xabar matnini saqlash uchun
+    # 6. settings table
     await execute_query("""
         CREATE TABLE IF NOT EXISTS settings (
             key VARCHAR(100) PRIMARY KEY,
@@ -80,12 +86,12 @@ async def create_tables():
 
     # Default sozlamalar
     default_settings = {
-        'reminder_hour': '6',
+        'reminder_hour':   '6',
         'reminder_minute': '0',
-        'reminder_text': "☀️ Xayrli tong!\n\nBugun nonushtaga nima buyurtma qilasiz? 🥛🧀🍞\nQuyidagi mahsulotlardan birini tanlab buyurtma berishingiz mumkin:",
-        'reminder_photo': '',
-        'report_hour': '6',
-        'report_minute': '0',
+        'reminder_text':   "☀️ Xayrli tong!\n\nBugun nonushtaga nima buyurtma qilasiz? 🥛🧀🍞\nQuyidagi mahsulotlardan birini tanlab buyurtma berishingiz mumkin:",
+        'reminder_photo':  '',
+        'report_hour':     '6',
+        'report_minute':   '0',
     }
     for k, v in default_settings.items():
         await execute_query(
@@ -105,7 +111,7 @@ async def create_tables():
     products_count = await fetch_val("SELECT COUNT(*) FROM products;")
     if products_count == 0:
         default_products = [
-            ("Qatiq", Decimal("7000.00")),
+            ("Qatiq",  Decimal("7000.00")),
             ("Qaymoq", Decimal("20000.00")),
             ("Tvorog", Decimal("8500.00")),
             ("Malako", Decimal("12000.00"))
@@ -124,13 +130,11 @@ async def get_user_by_telegram_id(telegram_id: int) -> Optional[Dict[str, Any]]:
     return dict(row) if row else None
 
 async def get_user_by_phone_number(phone_number: str) -> Optional[Dict[str, Any]]:
-    # Standardize phone number search by stripping extra chars if needed, 
-    # but exact match is safe since bot provides contact
     row = await fetch_row("SELECT * FROM users WHERE phone_number = $1;", phone_number)
     return dict(row) if row else None
 
-async def create_user(telegram_id: int, full_name: str, phone_number: str, 
-                      latitude: float, longitude: float, branch_id: int = 1, 
+async def create_user(telegram_id: int, full_name: str, phone_number: str,
+                      latitude: float, longitude: float, branch_id: int = 1,
                       is_admin: bool = False) -> Dict[str, Any]:
     row = await fetch_row(
         """
@@ -166,38 +170,63 @@ async def get_product_by_id(product_id: int) -> Optional[Dict[str, Any]]:
 async def update_product_price(product_id: int, new_price: Decimal):
     await execute_query("UPDATE products SET price = $1 WHERE id = $2;", new_price, product_id)
 
-async def add_product(name: str, price: Decimal) -> Dict[str, Any]:
+async def add_product(name: str, price: Decimal, image_url: str = None) -> Dict[str, Any]:
+    """✅ YaNGI: image_url parametri qo'shildi"""
     row = await fetch_row(
-        "INSERT INTO products (name, price) VALUES ($1, $2) RETURNING *;",
-        name, price
+        "INSERT INTO products (name, price, image_url) VALUES ($1, $2, $3) RETURNING *;",
+        name, price, image_url
     )
     return dict(row)
 
 async def set_product_active_status(product_id: int, is_active: bool):
     await execute_query("UPDATE products SET is_active = $1 WHERE id = $2;", is_active, product_id)
 
+# ✅ YaNGI: Mahsulot rasmini yangilash
+async def update_product_image(product_id: int, image_url: str) -> Optional[Dict[str, Any]]:
+    """Admin tomonidan mahsulot rasmini yangilash."""
+    row = await fetch_row(
+        "UPDATE products SET image_url = $1 WHERE id = $2 RETURNING *;",
+        image_url, product_id
+    )
+    return dict(row) if row else None
+
+# ✅ YaNGI: Mahsulotni to'liq yangilash (nom, narx, rasm)
+async def update_product(product_id: int, name: str = None, price: Decimal = None,
+                         image_url: str = None) -> Optional[Dict[str, Any]]:
+    """Admin tomonidan mahsulot ma'lumotlarini yangilash."""
+    fields = []
+    values = []
+    idx = 1
+    if name is not None:
+        fields.append(f"name = ${idx}"); values.append(name); idx += 1
+    if price is not None:
+        fields.append(f"price = ${idx}"); values.append(price); idx += 1
+    if image_url is not None:
+        fields.append(f"image_url = ${idx}"); values.append(image_url); idx += 1
+    if not fields:
+        return await get_product_by_id(product_id)
+    values.append(product_id)
+    row = await fetch_row(
+        f"UPDATE products SET {', '.join(fields)} WHERE id = ${idx} RETURNING *;",
+        *values
+    )
+    return dict(row) if row else None
+
 # --- ORDER METHODS ---
 
 async def create_order(telegram_id: int, cart_items: List[Dict[str, Any]], total_price: Decimal,
-                       delivery_date: datetime.date = None, delivery_time_start: str = '06:30', 
+                       delivery_date: datetime.date = None, delivery_time_start: str = '06:30',
                        delivery_time_end: str = '07:30') -> int:
-    """
-    Creates an order with its items in a transaction.
-    cart_items should be a list of dicts: [{'product_id': int, 'quantity': float, 'price': Decimal}]
-    """
     if delivery_date is None:
-        # Deliver tomorrow morning
         delivery_date = datetime.date.today() + datetime.timedelta(days=1)
         
     pool = get_pool()
     async with pool.acquire() as conn:
         async with conn.transaction():
-            # Get user local ID
             user_id = await conn.fetchval("SELECT id FROM users WHERE telegram_id = $1;", telegram_id)
             if not user_id:
                 raise ValueError(f"User with telegram ID {telegram_id} not found in database.")
                 
-            # Create Order
             order_id = await conn.fetchval(
                 """
                 INSERT INTO orders (user_id, status, total_price, delivery_date, delivery_time_start, delivery_time_end)
@@ -207,7 +236,6 @@ async def create_order(telegram_id: int, cart_items: List[Dict[str, Any]], total
                 user_id, total_price, delivery_date, delivery_time_start, delivery_time_end
             )
             
-            # Create Order Items
             for item in cart_items:
                 await conn.execute(
                     """
@@ -220,7 +248,6 @@ async def create_order(telegram_id: int, cart_items: List[Dict[str, Any]], total
             return order_id
 
 async def get_user_orders(telegram_id: int, limit: int = 5) -> List[Dict[str, Any]]:
-    """Retrieves user's orders and their items."""
     query = """
         SELECT o.id as order_id, o.status, o.total_price, o.delivery_date, o.delivery_time_start, 
                o.delivery_time_end, o.created_at,
@@ -242,7 +269,6 @@ async def get_user_orders(telegram_id: int, limit: int = 5) -> List[Dict[str, An
     result = []
     for r in rows:
         order_dict = dict(r)
-        # Parse JSON array if needed (asyncpg automatically parses json / jsonb arrays as python lists)
         import json
         if isinstance(order_dict['items'], str):
             order_dict['items'] = json.loads(order_dict['items'])
@@ -250,7 +276,6 @@ async def get_user_orders(telegram_id: int, limit: int = 5) -> List[Dict[str, An
     return result
 
 async def get_all_orders(limit: int = 50) -> List[Dict[str, Any]]:
-    """Retrieves all orders with user info."""
     query = """
         SELECT o.id as order_id, o.status, o.total_price, o.delivery_date, o.delivery_time_start, 
                o.delivery_time_end, o.created_at, u.full_name, u.phone_number, u.telegram_id,
@@ -284,10 +309,6 @@ async def update_order_status(order_id: int, status: str):
 # --- REPORT METHODS ---
 
 async def get_production_report(date: datetime.date) -> List[Dict[str, Any]]:
-    """
-    Computes total quantity of each product needed for production on a specific date.
-    Only includes orders with status 'confirmed' (or 'pending').
-    """
     query = """
         SELECT p.name as product_name, SUM(oi.quantity) as total_quantity
         FROM order_items oi
@@ -301,7 +322,6 @@ async def get_production_report(date: datetime.date) -> List[Dict[str, Any]]:
     return [dict(r) for r in rows]
 
 async def get_daily_sales_report(date: datetime.date) -> Dict[str, Any]:
-    """Computes daily sales report: total revenue, order count, etc."""
     query_sales = """
         SELECT COALESCE(SUM(total_price), 0) as revenue, COUNT(*) as order_count
         FROM orders
@@ -328,7 +348,6 @@ async def get_daily_sales_report(date: datetime.date) -> Dict[str, Any]:
     }
 
 async def get_undelivered_orders() -> List[Dict[str, Any]]:
-    """Barcha kunlardan yetkazilmagan (pending/confirmed) buyurtmalar."""
     query = """
         SELECT o.id as order_id, o.status, o.total_price, o.delivery_date, o.delivery_time_start, 
                o.delivery_time_end, o.created_at, u.full_name, u.phone_number, u.telegram_id,
@@ -360,17 +379,14 @@ async def get_undelivered_orders() -> List[Dict[str, Any]]:
     return result
 
 async def get_setting(key: str, default: str = None) -> Optional[str]:
-    """Bitta sozlamani olish."""
     row = await fetch_row("SELECT value FROM settings WHERE key = $1;", key)
     return row['value'] if row else default
 
 async def get_all_settings() -> Dict[str, str]:
-    """Barcha sozlamalarni dict sifatida olish."""
     rows = await fetch_rows("SELECT key, value FROM settings;")
     return {r['key']: r['value'] for r in rows}
 
 async def set_setting(key: str, value: str):
-    """Bitta sozlamani yangilash yoki yaratish."""
     await execute_query(
         """INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW())
            ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW();""",
@@ -378,17 +394,10 @@ async def set_setting(key: str, value: str):
     )
 
 async def get_dashboard_stats() -> Dict[str, Any]:
-    """Retrieves analytical statistics for the web admin dashboard."""
-    # 1. Total customers
     total_customers = await fetch_val("SELECT COUNT(*) FROM users;")
+    total_orders    = await fetch_val("SELECT COUNT(*) FROM orders;")
+    total_revenue   = await fetch_val("SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE status IN ('confirmed', 'completed');")
     
-    # 2. Total orders
-    total_orders = await fetch_val("SELECT COUNT(*) FROM orders;")
-    
-    # 3. Total revenue
-    total_revenue = await fetch_val("SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE status IN ('confirmed', 'completed');")
-    
-    # 4. Chart data: last 7 days sales and orders
     chart_query = """
         SELECT 
             d.date::date as sale_date,
@@ -400,8 +409,6 @@ async def get_dashboard_stats() -> Dict[str, Any]:
         ORDER BY d.date ASC;
     """
     chart_rows = await fetch_rows(chart_query)
-    
-    # Map chart rows into list of dicts with formatted dates
     chart_data = []
     for r in chart_rows:
         chart_data.append({
@@ -410,7 +417,6 @@ async def get_dashboard_stats() -> Dict[str, Any]:
             "orders": r["daily_orders"]
         })
         
-    # 5. Monthly stats (last 6 months)
     monthly_query = """
         SELECT 
             TO_CHAR(d.month, 'YYYY-MM') as month_label,
@@ -440,14 +446,12 @@ async def get_dashboard_stats() -> Dict[str, Any]:
             "qty": float(r["total_qty"])
         })
 
-    # 6. Today stats
     today = datetime.date.today()
     today_row = await fetch_row(
         "SELECT COALESCE(SUM(total_price),0) as rev, COUNT(*) as cnt FROM orders WHERE delivery_date=$1 AND status IN ('confirmed','completed');",
         today
     )
     
-    # 7. Top products (last 30 days)
     top_products_query = """
         SELECT p.name, SUM(oi.quantity) as total_qty, SUM(oi.quantity * oi.price_at_purchase) as total_rev
         FROM order_items oi
@@ -460,7 +464,6 @@ async def get_dashboard_stats() -> Dict[str, Any]:
     top_rows = await fetch_rows(top_products_query)
     top_products = [{"name": r["name"], "qty": float(r["total_qty"]), "rev": float(r["total_rev"])} for r in top_rows]
 
-    # 8. Forecast: average daily qty per product * 30
     forecast_query = """
         SELECT p.name,
             ROUND(SUM(oi.quantity)::numeric / GREATEST(COUNT(DISTINCT o.delivery_date), 1), 1) as avg_daily
@@ -476,18 +479,17 @@ async def get_dashboard_stats() -> Dict[str, Any]:
 
     return {
         "total_customers": total_customers,
-        "total_orders": total_orders,
-        "total_revenue": float(total_revenue),
-        "today_revenue": float(today_row["rev"]) if today_row else 0,
-        "today_orders": today_row["cnt"] if today_row else 0,
-        "chart_data": chart_data,
-        "monthly_data": monthly_data,
-        "top_products": top_products,
-        "forecast": forecast
+        "total_orders":    total_orders,
+        "total_revenue":   float(total_revenue),
+        "today_revenue":   float(today_row["rev"]) if today_row else 0,
+        "today_orders":    today_row["cnt"] if today_row else 0,
+        "chart_data":      chart_data,
+        "monthly_data":    monthly_data,
+        "top_products":    top_products,
+        "forecast":        forecast
     }
 
 async def get_dashboard_orders(date_filter: str = None) -> List[Dict[str, Any]]:
-    """Retrieves today\'s orders with user and items details, sorted for dashboard viewing."""
     if date_filter is None:
         date_filter = datetime.date.today().isoformat()
     query = """
@@ -507,7 +509,7 @@ async def get_dashboard_orders(date_filter: str = None) -> List[Dict[str, Any]]:
         GROUP BY o.id, u.id
         ORDER BY 
             CASE 
-                WHEN o.status = 'pending' THEN 1
+                WHEN o.status = 'pending'   THEN 1
                 WHEN o.status = 'confirmed' THEN 2
                 WHEN o.status = 'completed' THEN 3
                 ELSE 4
@@ -521,11 +523,8 @@ async def get_dashboard_orders(date_filter: str = None) -> List[Dict[str, Any]]:
         import json
         if isinstance(order_dict['items'], str):
             order_dict['items'] = json.loads(order_dict['items'])
-        
-        # Format datetimes/decimals for JSON serialization
         order_dict['delivery_date'] = order_dict['delivery_date'].strftime("%Y-%m-%d")
-        order_dict['created_at'] = order_dict['created_at'].strftime("%H:%M | %d.%m.%Y")
-        order_dict['total_price'] = float(order_dict['total_price'])
-        
+        order_dict['created_at']    = order_dict['created_at'].strftime("%H:%M | %d.%m.%Y")
+        order_dict['total_price']   = float(order_dict['total_price'])
         result.append(order_dict)
     return result
