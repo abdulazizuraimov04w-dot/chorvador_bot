@@ -15,12 +15,19 @@ def get_main_menu_keyboard(is_admin: bool = False) -> ReplyKeyboardMarkup:
     builder = ReplyKeyboardBuilder()
     if is_admin:
         builder.add(KeyboardButton(text="🔑 Admin Panel"))
+        builder.adjust(1)
     else:
         builder.add(KeyboardButton(text="🛒 Buyurtma berish"))
         builder.add(KeyboardButton(text="👤 Profilim"))
+        builder.add(KeyboardButton(text="📍 Joylashuvni yangilash"))
         builder.add(KeyboardButton(text="📞 Bog'lanish"))
-    builder.adjust(1)
+        builder.adjust(2, 2)
     return builder.as_markup(resize_keyboard=True)
+
+def get_update_location_keyboard() -> ReplyKeyboardMarkup:
+    builder = ReplyKeyboardBuilder()
+    builder.add(KeyboardButton(text="📍 Yangi lokatsiyani ulash", request_location=True))
+    return builder.as_markup(resize_keyboard=True, one_time_keyboard=True)
 
 def get_products_keyboard(products: list) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
