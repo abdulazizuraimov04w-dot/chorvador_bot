@@ -74,3 +74,13 @@ def get_order_actions_keyboard(order_id: int) -> InlineKeyboardMarkup:
     builder.add(InlineKeyboardButton(text="❌ Bekor qilish", callback_data=f"admin_order:cancel:{order_id}"))
     builder.adjust(2)
     return builder.as_markup()
+
+def get_mfy_keyboard(mfy_list: list) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for mfy in mfy_list:
+        builder.add(InlineKeyboardButton(
+            text=mfy['name'],
+            callback_data=f"select_mfy:{mfy['id']}"
+        ))
+    builder.adjust(2)
+    return builder.as_markup()

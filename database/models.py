@@ -98,6 +98,51 @@ async def create_tables():
             "INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING;",
             k, v
         )
+    # 7. couriers table
+    await execute_query("""
+        CREATE TABLE IF NOT EXISTS couriers (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            phone_number VARCHAR(20) NOT NULL,
+            telegram_id BIGINT UNIQUE,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT NOW()
+        );
+    """)
+
+    # 8. mfy table
+    await execute_query("""
+        CREATE TABLE IF NOT EXISTS mfy (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL UNIQUE,
+            courier_id INT REFERENCES couriers(id) ON DELETE SET NULL,
+            created_at TIMESTAMP DEFAULT NOW()
+        );
+    """)
+
+    # 9. scheduled_notifications table
+    await execute_query("""
+        CREATE TABLE IF NOT EXISTS scheduled_notifications (
+            id SERIAL PRIMARY KEY,
+            title VARCHAR(255) NOT NULL,
+            text TEXT NOT NULL,
+            media_url TEXT,
+            media_type VARCHAR(50),
+            send_hour INT NOT NULL,
+            send_minute INT NOT NULL,
+            is_active BOOLEAN DEFAULT TRUE,
+            last_sent_date DATE,
+            created_at TIMESTAMP DEFAULT NOW()
+        );
+    """)
+
+    # Migrations for users and orders
+    await execute_query("""
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS mfy_id INT REFERENCES mfy(id) ON DELETE SET NULL;
+    """)
+    await execute_query("""
+        ALTER TABLE orders ADD COLUMN IF NOT EXISTS courier_id INT REFERENCES couriers(id) ON DELETE SET NULL;
+    """)
 
     logger.info("Tables checked/created successfully.")
     
@@ -126,7 +171,12 @@ async def create_tables():
 # --- USER METHODS ---
 
 async def get_user_by_telegram_id(telegram_id: int) -> Optional[Dict[str, Any]]:
-    row = await fetch_row("SELECT * FROM users WHERE telegram_id = $1;", telegram_id)
+    row = await fetch_row("""
+        SELECT u.*, m.name as mfy_name 
+        FROM users u 
+        LEFT JOIN mfy m ON u.mfy_id = m.id 
+        WHERE u.telegram_id = $1;
+    """, telegram_id)
     return dict(row) if row else None
 
 async def get_user_by_phone_number(phone_number: str) -> Optional[Dict[str, Any]]:
@@ -135,19 +185,25 @@ async def get_user_by_phone_number(phone_number: str) -> Optional[Dict[str, Any]
 
 async def create_user(telegram_id: int, full_name: str, phone_number: str,
                       latitude: float, longitude: float, branch_id: int = 1,
-                      is_admin: bool = False) -> Dict[str, Any]:
+                      is_admin: bool = False, mfy_id: int = None) -> Dict[str, Any]:
     row = await fetch_row(
         """
-        INSERT INTO users (telegram_id, full_name, phone_number, latitude, longitude, branch_id, is_admin)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO users (telegram_id, full_name, phone_number, latitude, longitude, branch_id, is_admin, mfy_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *;
         """,
-        telegram_id, full_name, phone_number, latitude, longitude, branch_id, is_admin
+        telegram_id, full_name, phone_number, latitude, longitude, branch_id, is_admin, mfy_id
     )
     return dict(row)
 
 async def get_all_users() -> List[Dict[str, Any]]:
-    rows = await fetch_rows("SELECT u.*, b.name as branch_name FROM users u LEFT JOIN branches b ON u.branch_id = b.id ORDER BY u.created_at DESC;")
+    rows = await fetch_rows("""
+        SELECT u.*, b.name as branch_name, m.name as mfy_name 
+        FROM users u 
+        LEFT JOIN branches b ON u.branch_id = b.id 
+        LEFT JOIN mfy m ON u.mfy_id = m.id
+        ORDER BY u.created_at DESC;
+    """)
     return [dict(r) for r in rows]
 
 async def update_user_admin_status(telegram_id: int, is_admin: bool):
@@ -227,13 +283,19 @@ async def create_order(telegram_id: int, cart_items: List[Dict[str, Any]], total
             if not user_id:
                 raise ValueError(f"User with telegram ID {telegram_id} not found in database.")
                 
+            # Get user's mfy_id to auto-assign courier
+            mfy_id = await conn.fetchval("SELECT mfy_id FROM users WHERE id = $1;", user_id)
+            courier_id = None
+            if mfy_id:
+                courier_id = await conn.fetchval("SELECT courier_id FROM mfy WHERE id = $1;", mfy_id)
+
             order_id = await conn.fetchval(
                 """
-                INSERT INTO orders (user_id, status, total_price, delivery_date, delivery_time_start, delivery_time_end)
-                VALUES ($1, 'confirmed', $2, $3, $4, $5)
+                INSERT INTO orders (user_id, status, total_price, delivery_date, delivery_time_start, delivery_time_end, courier_id)
+                VALUES ($1, 'confirmed', $2, $3, $4, $5, $6)
                 RETURNING id;
                 """,
-                user_id, total_price, delivery_date, delivery_time_start, delivery_time_end
+                user_id, total_price, delivery_date, delivery_time_start, delivery_time_end, courier_id
             )
             
             for item in cart_items:
@@ -495,7 +557,8 @@ async def get_dashboard_orders(date_filter: str = None) -> List[Dict[str, Any]]:
     query = """
         SELECT o.id as order_id, o.status, o.total_price, o.delivery_date, o.delivery_time_start, 
                o.delivery_time_end, o.created_at, u.full_name, u.phone_number, u.telegram_id,
-               u.latitude, u.longitude,
+               u.latitude, u.longitude, m.name as mfy_name, c.name as courier_name, c.phone_number as courier_phone,
+               o.courier_id,
                array_to_json(array_agg(json_build_object(
                    'product_name', p.name,
                    'quantity', oi.quantity,
@@ -503,10 +566,12 @@ async def get_dashboard_orders(date_filter: str = None) -> List[Dict[str, Any]]:
                ))) as items
         FROM orders o
         JOIN users u ON o.user_id = u.id
+        LEFT JOIN mfy m ON u.mfy_id = m.id
+        LEFT JOIN couriers c ON o.courier_id = c.id
         LEFT JOIN order_items oi ON o.id = oi.order_id
         LEFT JOIN products p ON oi.product_id = p.id
         WHERE o.delivery_date = $1
-        GROUP BY o.id, u.id
+        GROUP BY o.id, u.id, m.name, c.name, c.phone_number
         ORDER BY 
             CASE 
                 WHEN o.status = 'pending'   THEN 1
@@ -528,3 +593,91 @@ async def get_dashboard_orders(date_filter: str = None) -> List[Dict[str, Any]]:
         order_dict['total_price']   = float(order_dict['total_price'])
         result.append(order_dict)
     return result
+
+# ============================================================
+# LOGISTICS (COURIERS & MFY) & SCHEDULED NOTIFICATIONS
+# ============================================================
+
+async def get_all_couriers() -> List[Dict[str, Any]]:
+    rows = await fetch_rows("SELECT * FROM couriers ORDER BY name ASC;")
+    return [dict(r) for r in rows]
+
+async def get_courier_by_id(courier_id: int) -> Optional[Dict[str, Any]]:
+    row = await fetch_row("SELECT * FROM couriers WHERE id = $1;", courier_id)
+    return dict(row) if row else None
+
+async def create_courier(name: str, phone_number: str, telegram_id: int = None) -> int:
+    return await fetch_val(
+        "INSERT INTO couriers (name, phone_number, telegram_id) VALUES ($1, $2, $3) RETURNING id;",
+        name, phone_number, telegram_id
+    )
+
+async def update_courier(courier_id: int, name: str, phone_number: str, telegram_id: int = None, is_active: bool = True):
+    await execute_query(
+        "UPDATE couriers SET name = $1, phone_number = $2, telegram_id = $3, is_active = $4 WHERE id = $5;",
+        name, phone_number, telegram_id, is_active, courier_id
+    )
+
+async def delete_courier(courier_id: int):
+    await execute_query("DELETE FROM couriers WHERE id = $1;", courier_id)
+
+
+async def get_all_mfy() -> List[Dict[str, Any]]:
+    rows = await fetch_rows("""
+        SELECT m.id, m.name, m.courier_id, c.name as courier_name 
+        FROM mfy m 
+        LEFT JOIN couriers c ON m.courier_id = c.id 
+        ORDER BY m.name ASC;
+    """)
+    return [dict(r) for r in rows]
+
+async def get_mfy_by_id(mfy_id: int) -> Optional[Dict[str, Any]]:
+    row = await fetch_row("SELECT * FROM mfy WHERE id = $1;", mfy_id)
+    return dict(row) if row else None
+
+async def create_mfy(name: str, courier_id: int = None) -> int:
+    return await fetch_val(
+        "INSERT INTO mfy (name, courier_id) VALUES ($1, $2) RETURNING id;",
+        name, courier_id
+    )
+
+async def update_mfy(mfy_id: int, name: str, courier_id: int = None):
+    await execute_query(
+        "UPDATE mfy SET name = $1, courier_id = $2 WHERE id = $3;",
+        name, courier_id, mfy_id
+    )
+
+async def delete_mfy(mfy_id: int):
+    await execute_query("DELETE FROM mfy WHERE id = $1;", mfy_id)
+
+
+async def get_all_scheduled_notifications() -> List[Dict[str, Any]]:
+    rows = await fetch_rows("SELECT * FROM scheduled_notifications ORDER BY send_hour ASC, send_minute ASC;")
+    return [dict(r) for r in rows]
+
+async def create_scheduled_notification(title: str, text: str, media_url: str = None, media_type: str = None, send_hour: int = 6, send_minute: int = 0) -> int:
+    return await fetch_val(
+        "INSERT INTO scheduled_notifications (title, text, media_url, media_type, send_hour, send_minute) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id;",
+        title, text, media_url, media_type, send_hour, send_minute
+    )
+
+async def update_scheduled_notification(notif_id: int, title: str, text: str, media_url: str = None, media_type: str = None, send_hour: int = 6, send_minute: int = 0, is_active: bool = True):
+    await execute_query(
+        "UPDATE scheduled_notifications SET title = $1, text = $2, media_url = $3, media_type = $4, send_hour = $5, send_minute = $6, is_active = $7 WHERE id = $8;",
+        title, text, media_url, media_type, send_hour, send_minute, is_active, notif_id
+    )
+
+async def delete_scheduled_notification(notif_id: int):
+    await execute_query("DELETE FROM scheduled_notifications WHERE id = $1;", notif_id)
+
+async def update_notification_last_sent(notif_id: int, last_sent_date: datetime.date):
+    await execute_query(
+        "UPDATE scheduled_notifications SET last_sent_date = $1 WHERE id = $2;",
+        last_sent_date, notif_id
+    )
+
+async def update_order_courier(order_id: int, courier_id: int = None):
+    await execute_query(
+        "UPDATE orders SET courier_id = $1 WHERE id = $2;",
+        courier_id, order_id
+    )

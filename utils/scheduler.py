@@ -123,19 +123,79 @@ async def send_production_report_to_admins(bot: Bot):
     except Exception as db_fetch_err:
         logger.error(f"Failed to fetch DB admin users for report: {db_fetch_err}")
 
+async def send_scheduled_notification(bot: Bot, notif: dict):
+    """Mijozlarga rejalashtirilgan eslatmani (rasm/video bilan) yuboradi."""
+    logger.info(f"Triggering scheduled notification: {notif['title']} (ID: {notif['id']})")
+    
+    text = notif['text']
+    media_url = notif.get('media_url', '')
+    media_type = notif.get('media_type', '')
+    
+    base_url = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
+    miniapp_url = f"{base_url}/miniapp"
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text="📲 Buyurtma berish",
+            web_app=WebAppInfo(url=miniapp_url)
+        )
+    ]])
+    
+    try:
+        users = await models.get_all_users()
+    except Exception as e:
+        logger.error(f"Failed to fetch users for scheduled notification {notif['id']}: {e}")
+        return
+        
+    sent_count = 0
+    fail_count = 0
+    
+    for u in users:
+        if not u.get("is_admin", False):
+            try:
+                if media_url and media_type == 'photo':
+                    await bot.send_photo(
+                        chat_id=u['telegram_id'],
+                        photo=URLInputFile(media_url),
+                        caption=text,
+                        reply_markup=keyboard,
+                        parse_mode="Markdown"
+                    )
+                elif media_url and media_type == 'video':
+                    await bot.send_video(
+                        chat_id=u['telegram_id'],
+                        video=URLInputFile(media_url),
+                        caption=text,
+                        reply_markup=keyboard,
+                        parse_mode="Markdown"
+                    )
+                else:
+                    await bot.send_message(
+                        chat_id=u['telegram_id'],
+                        text=text,
+                        reply_markup=keyboard,
+                        parse_mode="Markdown"
+                    )
+                sent_count += 1
+                await asyncio.sleep(0.05)   # Telegram rate limit
+            except Exception as send_err:
+                fail_count += 1
+                logger.error(f"Failed to send scheduled notification {notif['id']} to {u['telegram_id']}: {send_err}")
+                
+    logger.info(f"Scheduled notification {notif['id']} complete. Sent: {sent_count}, Failed: {fail_count}.")
 
 async def scheduler_loop(bot: Bot):
     """Har kuni belgilangan vaqtda (bazadan o'qib) hisobot va eslatma yuboradi."""
     logger.info("Automated scheduler background task started.")
-
+ 
     last_run_date = None
     last_customer_run_date = None
-
+ 
     while True:
         try:
             now = datetime.datetime.now()
             today = now.date()
-
+ 
             # Bazadan joriy vaqtlarni o'qish (har safar — admin o'zgartirgan bo'lishi mumkin)
             try:
                 report_hour   = int(await models.get_setting('report_hour',   '6'))
@@ -146,21 +206,32 @@ async def scheduler_loop(bot: Bot):
                 logger.error(f"Settings o'qishda xato, defaultga o'tildi: {set_err}")
                 report_hour, report_minute     = 6, 0
                 reminder_hour, reminder_minute = 6, 0
-
+ 
             # Admin hisoboti
             if now.hour == report_hour and now.minute == report_minute:
                 if last_run_date != today:
                     await send_production_report_to_admins(bot)
                     last_run_date = today
-
+ 
             # Mijoz eslatmasi
             if now.hour == reminder_hour and now.minute == reminder_minute:
                 if last_customer_run_date != today:
                     await send_breakfast_reminder_to_customers(bot)
                     last_customer_run_date = today
-
+ 
+            # Dinamik scheduled notifications
+            try:
+                active_notifs = await models.get_all_scheduled_notifications()
+                for notif in active_notifs:
+                    if notif['is_active'] and now.hour == notif['send_hour'] and now.minute == notif['send_minute']:
+                        if notif['last_sent_date'] != today:
+                            await send_scheduled_notification(bot, notif)
+                            await models.update_notification_last_sent(notif['id'], today)
+            except Exception as dyn_err:
+                logger.error(f"Error checking dynamic scheduled notifications: {dyn_err}")
+ 
             await asyncio.sleep(30)
-
+ 
         except asyncio.CancelledError:
             logger.info("Scheduler task cancelled.")
             break

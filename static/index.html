@@ -354,7 +354,9 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
       <button class="nav-item" onclick="navigate('payments',this)"><span class="icon">💰</span> To'lovlar</button>
       <button class="nav-item" onclick="navigate('map',this)"><span class="icon">🗺️</span> Yetkazish xaritasi</button>
       <button class="nav-item" onclick="navigate('miniapp',this)"><span class="icon">📱</span> Mini App</button>
-      <button class="nav-item" onclick="navigate('settings',this)"><span class="icon">⏰</span> Eslatma sozlamalari</button>
+      <button class="nav-item" onclick="navigate('settings',this)"><span class="icon">⚙️</span> Eslatma sozlamalari</button>
+      <button class="nav-item" onclick="navigate('logistics',this)"><span class="icon">🚚</span> Kuryer & MFY</button>
+      <button class="nav-item" onclick="navigate('reminders',this)"><span class="icon">⏰</span> Eslatmalar</button>
     </nav>
     <div class="sidebar-footer">
       <div style="font-size:11px;color:var(--muted);text-align:center;" id="sidebar-time">--:--</div>
@@ -454,7 +456,7 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
           </div>
           <div class="customers-table-wrap">
             <table>
-              <thead><tr><th>#</th><th>Ism</th><th>Telefon</th><th>Filial</th><th>Lokatsiya</th><th>Ro'yxatdan o'tgan</th></tr></thead>
+              <thead><tr><th>#</th><th>Ism</th><th>Telefon</th><th>Mahalla (MFY)</th><th>Lokatsiya</th><th>Ro'yxatdan o'tgan</th></tr></thead>
               <tbody id="customers-body"><tr><td colspan="6"><div class="loader"><div class="spinner"></div></div></td></tr></tbody>
             </table>
           </div>
@@ -470,6 +472,12 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
               <div style="font-size:13px;font-weight:600;">Barcha mijozlarga xabar</div>
               <div style="font-size:11px;color:var(--muted);" id="broadcast-count">Mijozlar soni yuklanmoqda...</div>
             </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Mahalla (MFY) bo'yicha saralash</label>
+            <select class="form-input" id="broadcast-mfy-select" onchange="loadBroadcastCount()">
+              <option value="">Barcha Mahallalarga (Hamma mijozlar)</option>
+            </select>
           </div>
           <div class="form-group">
             <label class="form-label">Media turi (ixtiyoriy)</label>
@@ -639,6 +647,84 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
               Bu vaqtda barcha adminlarga shu kuni yetkazilishi kerak bo'lgan mahsulotlar ro'yxati avtomatik yuboriladi.
             </p>
             <button class="miniapp-save-btn" onclick="saveReportSettings()">💾 Hisobot vaqtini saqlash</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- LOGISTICS PAGE -->
+      <div class="page" id="page-logistics">
+        <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:20px;">
+          <!-- Couriers Box -->
+          <div class="card" style="flex:1.2;min-width:300px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+              <h3 style="font-size:16px;">🚚 Kuryerlar ro'yxati</h3>
+              <button class="action-btn primary" onclick="openAddCourierModal()">➕ Yangi kuryer</button>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="table" style="width:100%;border-collapse:collapse;text-align:left;">
+                <thead>
+                  <tr style="border-bottom:1px solid var(--border);color:var(--muted);font-size:12px;">
+                    <th style="padding:10px 5px;">Ism</th>
+                    <th style="padding:10px 5px;">Telefon</th>
+                    <th style="padding:10px 5px;">Telegram ID</th>
+                    <th style="padding:10px 5px;">Status</th>
+                    <th style="padding:10px 5px;text-align:right;">Amallar</th>
+                  </tr>
+                </thead>
+                <tbody id="couriers-table-body">
+                  <!-- JS dynamically populates -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- MFY Box -->
+          <div class="card" style="flex:1;min-width:300px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+              <h3 style="font-size:16px;">📍 Mahallalar (MFY)</h3>
+              <button class="action-btn primary" onclick="openAddMfyModal()">➕ Yangi mahalla</button>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="table" style="width:100%;border-collapse:collapse;text-align:left;">
+                <thead>
+                  <tr style="border-bottom:1px solid var(--border);color:var(--muted);font-size:12px;">
+                    <th style="padding:10px 5px;">Mahalla</th>
+                    <th style="padding:10px 5px;">Kuryer</th>
+                    <th style="padding:10px 5px;text-align:right;">Amallar</th>
+                  </tr>
+                </thead>
+                <tbody id="mfy-table-body">
+                  <!-- JS dynamically populates -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- REMINDERS PAGE -->
+      <div class="page" id="page-reminders">
+        <div class="card" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+            <h3 style="font-size:16px;">⏰ Rejalashtirilgan Avtomatik Eslatmalar</h3>
+            <button class="action-btn primary" onclick="openAddReminderModal()">➕ Yangi eslatma</button>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="table" style="width:100%;border-collapse:collapse;text-align:left;">
+              <thead>
+                <tr style="border-bottom:1px solid var(--border);color:var(--muted);font-size:12px;">
+                  <th style="padding:10px 5px;">Sarlavha</th>
+                  <th style="padding:10px 5px;">Matn</th>
+                  <th style="padding:10px 5px;">Vaqti</th>
+                  <th style="padding:10px 5px;">Media</th>
+                  <th style="padding:10px 5px;">Status</th>
+                  <th style="padding:10px 5px;text-align:right;">Amallar</th>
+                </tr>
+              </thead>
+              <tbody id="reminders-table-body">
+                <!-- JS dynamically populates -->
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

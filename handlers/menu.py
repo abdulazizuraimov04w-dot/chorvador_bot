@@ -1,6 +1,6 @@
 import os
 from aiogram import Router, F
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, CallbackQuery
 from aiogram.fsm.context import FSMContext
 
 from database import models
@@ -33,10 +33,11 @@ async def cmd_profile(message: Message):
         await message.answer("Siz ro'yxatdan o'tmagansiz. /start bosing.")
         return
     reg_date = user['created_at'].strftime("%d.%m.%Y %H:%M")
+    mfy_text = f"\n📍 *Mahalla:* {user['mfy_name']} MFY" if user.get('mfy_name') else ""
     await message.answer(
         f"👤 *Profil:*\n\n"
         f"📝 *Ism:* {user['full_name']}\n"
-        f"📞 *Telefon:* {user['phone_number']}\n"
+        f"📞 *Telefon:* {user['phone_number']}{mfy_text}\n"
         f"📅 *Ro'yxatdan o'tgan:* {reg_date}",
         parse_mode="Markdown")
 
@@ -80,27 +81,82 @@ async def process_new_location(message: Message, state: FSMContext):
     longitude = message.location.longitude
     telegram_id = message.from_user.id
     
+    await state.update_data(latitude=latitude, longitude=longitude)
+    logger.info(f"FSM profile state: Location update received Lat={latitude}, Lon={longitude} for telegram ID {telegram_id}")
+    
+    try:
+        mfy_list = await models.get_all_mfy()
+        if not mfy_list:
+            # If no MFYs configured, update location directly and clear
+            from database.connection import execute_query
+            await execute_query(
+                "UPDATE users SET latitude = $1, longitude = $2 WHERE telegram_id = $3;",
+                latitude, longitude, telegram_id
+            )
+            user = await models.get_user_by_telegram_id(telegram_id)
+            is_admin = user.get("is_admin", False) if user else False
+            
+            await message.answer(
+                "📍 **Joylashuv muvaffaqiyatli yangilandi!**\n\n"
+                "Endi buyurtmalaringiz ushbu yangi manzilga yetkazib beriladi.",
+                reply_markup=keyboards.get_main_menu_keyboard(is_admin=is_admin),
+                parse_mode="Markdown"
+            )
+            await state.clear()
+        else:
+            await state.set_state(ProfileStates.waiting_for_new_mfy)
+            await message.answer(
+                "Rahmat! Endi yangi manzilingizga muvofiq **Mahallangizni (MFY)** tanlang:",
+                reply_markup=keyboards.get_mfy_keyboard(mfy_list)
+            )
+    except Exception as e:
+        logger.error(f"Failed to update location for user {telegram_id}: {e}")
+        await message.answer(
+            "Tizimda xatolik yuz berdi. Iltimos, keyinroq qayta urinib ko'ring."
+        )
+
+@router.callback_query(ProfileStates.waiting_for_new_mfy, F.data.startswith("select_mfy:"))
+async def process_new_mfy_selection(callback_query: CallbackQuery, state: FSMContext):
+    telegram_id = callback_query.from_user.id
+    mfy_id = int(callback_query.data.split(":")[1])
+    
+    data = await state.get_data()
+    latitude = data.get("latitude")
+    longitude = data.get("longitude")
+    
+    logger.info(f"Updating MFY and location for user {telegram_id}: Lat={latitude}, Lon={longitude}, MFY={mfy_id}")
+    
     try:
         from database.connection import execute_query
         await execute_query(
-            "UPDATE users SET latitude = $1, longitude = $2 WHERE telegram_id = $3;",
-            latitude, longitude, telegram_id
+            "UPDATE users SET latitude = $1, longitude = $2, mfy_id = $3 WHERE telegram_id = $4;",
+            latitude, longitude, mfy_id, telegram_id
         )
-        logger.info(f"User {telegram_id} updated their location: Lat={latitude}, Lon={longitude}")
+        
+        mfy_data = await models.get_mfy_by_id(mfy_id)
+        mfy_name = mfy_data['name'] if mfy_data else ""
+        
+        await callback_query.answer("Joylashuv va mahalla yangilandi!")
+        await callback_query.message.edit_text(
+            f"Yangi tanlangan mahalla: **{mfy_name}**",
+            parse_mode="Markdown"
+        )
         
         user = await models.get_user_by_telegram_id(telegram_id)
         is_admin = user.get("is_admin", False) if user else False
         
-        await message.answer(
-            "📍 **Joylashuv muvaffaqiyatli yangilandi!**\n\n"
-            "Endi buyurtmalaringiz ushbu yangi manzilga yetkazib beriladi.",
+        await callback_query.message.answer(
+            "📍 **Joylashuv va mahalla muvaffaqiyatli yangilandi!**\n\n"
+            f"Mahalla: **{mfy_name}** MFY\n\n"
+            "Buyurtmalaringiz ushbu yangi manzilga va kuryerga yetkazib beriladi.",
             reply_markup=keyboards.get_main_menu_keyboard(is_admin=is_admin),
             parse_mode="Markdown"
         )
         await state.clear()
     except Exception as e:
-        logger.error(f"Failed to update location for user {telegram_id}: {e}")
-        await message.answer(
+        logger.error(f"Failed to update location/MFY for user {telegram_id}: {e}")
+        await callback_query.answer("Tizim xatosi yuz berdi.", show_alert=True)
+        await callback_query.message.answer(
             "Tizimda xatolik yuz berdi. Iltimos, keyinroq qayta urinib ko'ring."
         )
 

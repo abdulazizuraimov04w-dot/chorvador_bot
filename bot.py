@@ -363,6 +363,14 @@ async def api_broadcast(request):
         text = data.get("text", "").strip()
         media_url = data.get("media_url", "").strip()
         media_type = data.get("media_type", "")  # 'photo' yoki 'video'
+        mfy_id = data.get("mfy_id")
+
+        target_mfy_id = None
+        if mfy_id is not None and str(mfy_id).strip() != "":
+            try:
+                target_mfy_id = int(mfy_id)
+            except ValueError:
+                target_mfy_id = None
 
         if not text and not media_url:
             return web.json_response({"error": "Xabar matni yoki media bo'sh!"}, status=400)
@@ -370,6 +378,9 @@ async def api_broadcast(request):
         users = await models.get_all_users()
         sent, failed = 0, 0
         for user in users:
+            # Filter by MFY if requested
+            if target_mfy_id is not None and user.get("mfy_id") != target_mfy_id:
+                continue
             try:
                 if media_url and media_type == 'photo':
                     await bot.send_photo(
@@ -485,6 +496,26 @@ async def api_miniapp_order(request):
 
         logger.info(f"MiniApp: Yangi buyurtma #{order_id} — tg:{telegram_id}")
 
+        # Get the assigned courier for this order
+        courier_tg_id = None
+        courier_name = None
+        mfy_name = None
+        try:
+            order_row = await models.fetch_row("""
+                SELECT o.id, c.telegram_id as courier_tg_id, c.name as courier_name, m.name as mfy_name
+                FROM orders o
+                JOIN users u ON o.user_id = u.id
+                LEFT JOIN mfy m ON u.mfy_id = m.id
+                LEFT JOIN couriers c ON o.courier_id = c.id
+                WHERE o.id = $1;
+            """, order_id)
+            if order_row:
+                courier_tg_id = order_row['courier_tg_id']
+                courier_name = order_row['courier_name']
+                mfy_name = order_row['mfy_name']
+        except Exception as err:
+            logger.error(f"Failed to fetch courier for order notification: {err}")
+
         # Adminlarga xabar yuborish
         try:
             admin_ids_env = [int(x.strip()) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip().isdigit()]
@@ -499,11 +530,16 @@ async def api_miniapp_order(request):
                 name = prod['name'] if prod else f"Mahsulot #{i['product_id']}"
                 items_text += f"  - {name}: {i['quantity']} dona\n"
 
+            courier_info = f"**Kuryer:** {courier_name}\n" if courier_name else ""
+            mfy_info = f"**Mahalla (MFY):** {mfy_name} MFY\n" if mfy_name else ""
+
             admin_text = (
                 f"🔔 *YANGI BUYURTMA (Mini App)*\n\n"
                 f"*Buyurtma:* #{order_id}\n"
                 f"*Mijoz:* {user['full_name']}\n"
                 f"*Telefon:* {user['phone_number']}\n"
+                f"{mfy_info}"
+                f"{courier_info}"
                 f"*Yetkazish:* {delivery_date} | {delivery_time_start}–{delivery_time_end}\n\n"
                 f"*Mahsulotlar:*\n{items_text}"
                 f"💵 *Jami:* {int(total_price):,} so'm\n\n"
@@ -518,6 +554,30 @@ async def api_miniapp_order(request):
                     logger.warning(f"MiniApp: admin {admin_id} ga xabar yuborib bo'lmadi: {ae}")
         except Exception as admin_err:
             logger.error(f"MiniApp admin notification error: {admin_err}")
+
+        # Send notification to courier
+        if courier_tg_id:
+            try:
+                loc_link = ""
+                if user.get("latitude") and user.get("longitude"):
+                    loc_link = f"\n📍 [Mijoz joylashuvi (Lokatsiya)](https://maps.google.com/?q={user['latitude']},{user['longitude']})"
+                
+                courier_text = (
+                    f"🚚 **YANGI BUYURTMA (Kuryer uchun)**\n\n"
+                    f"**Hudud (MFY):** {mfy_name} MFY\n"
+                    f"**Buyurtma:** #{order_id}\n"
+                    f"**Mijoz:** {user['full_name']}\n"
+                    f"**Telefon:** {user['phone_number']}\n"
+                    f"**Yetkazish:** {delivery_date} | {delivery_time_start}–{delivery_time_end}\n\n"
+                    f"**Mahsulotlar:**\n{items_text}\n"
+                    f"💵 **Jami:** {int(total_price):,} so'm\n"
+                    f"{loc_link}"
+                ).replace(",", " ")
+                
+                await bot.send_message(chat_id=courier_tg_id, text=courier_text, parse_mode="Markdown")
+                logger.info(f"MiniApp order notification sent to courier {courier_tg_id}")
+            except Exception as notify_err:
+                logger.error(f"Failed to send order notification to courier {courier_tg_id}: {notify_err}")
 
         # Foydalanuvchiga tasdiqlash xabari
         time_label = {
@@ -574,6 +634,268 @@ async def api_miniapp_get_orders(request):
 
 
 # ============================================================
+# LOGISTICS & SCHEDULED NOTIFICATIONS API ENDPOINTS
+# ============================================================
+
+async def api_get_couriers(request):
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        couriers = await models.get_all_couriers()
+        return web.json_response(couriers)
+    except Exception as e:
+        logger.error(f"api_get_couriers: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+async def api_create_courier(request):
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        data = await request.json()
+        name = data.get("name", "").strip()
+        phone_number = data.get("phone_number", "").strip()
+        telegram_id = data.get("telegram_id")
+        
+        if not name or not phone_number:
+            return web.json_response({"error": "Ism va telefon raqam bo'sh bo'lmasligi kerak!"}, status=400)
+            
+        tg_id = int(telegram_id) if telegram_id else None
+        courier_id = await models.create_courier(name, phone_number, tg_id)
+        return web.json_response({"success": True, "id": courier_id})
+    except Exception as e:
+        logger.error(f"api_create_courier: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+async def api_update_courier(request):
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        courier_id = int(request.match_info['id'])
+        data = await request.json()
+        name = data.get("name", "").strip()
+        phone_number = data.get("phone_number", "").strip()
+        telegram_id = data.get("telegram_id")
+        is_active = data.get("is_active", True)
+        
+        if not name or not phone_number:
+            return web.json_response({"error": "Ism va telefon raqam bo'sh bo'lmasligi kerak!"}, status=400)
+            
+        tg_id = int(telegram_id) if telegram_id else None
+        await models.update_courier(courier_id, name, phone_number, tg_id, is_active)
+        return web.json_response({"success": True})
+    except Exception as e:
+        logger.error(f"api_update_courier: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+async def api_delete_courier(request):
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        courier_id = int(request.match_info['id'])
+        await models.delete_courier(courier_id)
+        return web.json_response({"success": True})
+    except Exception as e:
+        logger.error(f"api_delete_courier: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+
+async def api_get_mfy(request):
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        mfy = await models.get_all_mfy()
+        return web.json_response(mfy)
+    except Exception as e:
+        logger.error(f"api_get_mfy: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+async def api_create_mfy(request):
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        data = await request.json()
+        name = data.get("name", "").strip()
+        courier_id = data.get("courier_id")
+        
+        if not name:
+            return web.json_response({"error": "Mahalla nomi bo'sh bo'lmasligi kerak!"}, status=400)
+            
+        c_id = int(courier_id) if courier_id else None
+        mfy_id = await models.create_mfy(name, c_id)
+        return web.json_response({"success": True, "id": mfy_id})
+    except Exception as e:
+        logger.error(f"api_create_mfy: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+async def api_update_mfy(request):
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        mfy_id = int(request.match_info['id'])
+        data = await request.json()
+        name = data.get("name", "").strip()
+        courier_id = data.get("courier_id")
+        
+        if not name:
+            return web.json_response({"error": "Mahalla nomi bo'sh bo'lmasligi kerak!"}, status=400)
+            
+        c_id = int(courier_id) if courier_id else None
+        await models.update_mfy(mfy_id, name, c_id)
+        return web.json_response({"success": True})
+    except Exception as e:
+        logger.error(f"api_update_mfy: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+async def api_delete_mfy(request):
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        mfy_id = int(request.match_info['id'])
+        await models.delete_mfy(mfy_id)
+        return web.json_response({"success": True})
+    except Exception as e:
+        logger.error(f"api_delete_mfy: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+
+async def api_get_scheduled_notifications(request):
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        notifs = await models.get_all_scheduled_notifications()
+        for n in notifs:
+            if n.get('last_sent_date'):
+                n['last_sent_date'] = n['last_sent_date'].strftime("%Y-%m-%d")
+        return web.json_response(notifs)
+    except Exception as e:
+        logger.error(f"api_get_scheduled_notifications: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+async def api_create_scheduled_notification(request):
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        data = await request.json()
+        title = data.get("title", "").strip()
+        text = data.get("text", "").strip()
+        media_url = data.get("media_url", "").strip()
+        media_type = data.get("media_type")
+        send_hour = int(data.get("send_hour", 6))
+        send_minute = int(data.get("send_minute", 0))
+        
+        if not title or not text:
+            return web.json_response({"error": "Sarlavha va matn bo'sh bo'lmasligi kerak!"}, status=400)
+            
+        notif_id = await models.create_scheduled_notification(
+            title, text, media_url or None, media_type or None, send_hour, send_minute
+        )
+        return web.json_response({"success": True, "id": notif_id})
+    except Exception as e:
+        logger.error(f"api_create_scheduled_notification: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+async def api_update_scheduled_notification(request):
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        notif_id = int(request.match_info['id'])
+        data = await request.json()
+        title = data.get("title", "").strip()
+        text = data.get("text", "").strip()
+        media_url = data.get("media_url", "").strip()
+        media_type = data.get("media_type")
+        send_hour = int(data.get("send_hour", 6))
+        send_minute = int(data.get("send_minute", 0))
+        is_active = data.get("is_active", True)
+        
+        if not title or not text:
+            return web.json_response({"error": "Sarlavha va matn bo'sh bo'lmasligi kerak!"}, status=400)
+            
+        await models.update_scheduled_notification(
+            notif_id, title, text, media_url or None, media_type or None, send_hour, send_minute, is_active
+        )
+        return web.json_response({"success": True})
+    except Exception as e:
+        logger.error(f"api_update_scheduled_notification: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+async def api_delete_scheduled_notification(request):
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        notif_id = int(request.match_info['id'])
+        await models.delete_scheduled_notification(notif_id)
+        return web.json_response({"success": True})
+    except Exception as e:
+        logger.error(f"api_delete_scheduled_notification: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+async def api_assign_order_courier(request):
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        order_id = int(request.match_info['id'])
+        data = await request.json()
+        courier_id = data.get("courier_id")
+        
+        c_id = int(courier_id) if courier_id else None
+        await models.update_order_courier(order_id, c_id)
+        
+        # Send a notification to the courier if assigned
+        if c_id:
+            order_row = await models.fetch_row("""
+                SELECT o.id, o.total_price, o.delivery_date, o.delivery_time_start, o.delivery_time_end,
+                       c.telegram_id as courier_tg_id, c.name as courier_name, m.name as mfy_name,
+                       u.full_name as user_name, u.phone_number as user_phone, u.latitude, u.longitude,
+                       array_to_json(array_agg(json_build_object(
+                           'product_name', p.name,
+                           'quantity', oi.quantity
+                       ))) as items
+                FROM orders o
+                JOIN users u ON o.user_id = u.id
+                LEFT JOIN mfy m ON u.mfy_id = m.id
+                LEFT JOIN couriers c ON o.courier_id = c.id
+                LEFT JOIN order_items oi ON o.id = oi.order_id
+                LEFT JOIN products p ON oi.product_id = p.id
+                WHERE o.id = $1
+                GROUP BY o.id, u.id, m.name, c.name, c.telegram_id;
+            """, order_id)
+            
+            if order_row and order_row['courier_tg_id']:
+                import json
+                items_list = json.loads(order_row['items']) if isinstance(order_row['items'], str) else order_row['items']
+                items_text = ""
+                for it in items_list:
+                    items_text += f"  - {it['product_name']}: {it['quantity']} dona\n"
+                    
+                loc_link = ""
+                if order_row['latitude'] and order_row['longitude']:
+                    loc_link = f"\n📍 [Mijoz joylashuvi (Lokatsiya)](https://maps.google.com/?q={order_row['latitude']},{order_row['longitude']})"
+                
+                courier_text = (
+                    f"🚚 **BUYURTMA BIRIKTIRILDI (Kuryer uchun)**\n\n"
+                    f"**Hudud (MFY):** {order_row['mfy_name']} MFY\n"
+                    f"**Buyurtma:** #{order_id}\n"
+                    f"**Mijoz:** {order_row['user_name']}\n"
+                    f"**Telefon:** {order_row['user_phone']}\n"
+                    f"**Yetkazish:** {order_row['delivery_date']} | {order_row['delivery_time_start']}–{order_row['delivery_time_end']}\n\n"
+                    f"**Mahsulotlar:**\n{items_text}\n"
+                    f"💵 **Jami:** {int(order_row['total_price']):,} so'm\n"
+                    f"{loc_link}"
+                ).replace(",", " ")
+                
+                try:
+                    await bot.send_message(chat_id=order_row['courier_tg_id'], text=courier_text, parse_mode="Markdown")
+                except Exception as notify_err:
+                    logger.error(f"Failed to notify courier on manual assign: {notify_err}")
+
+        return web.json_response({"success": True})
+    except Exception as e:
+        logger.error(f"api_assign_order_courier: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+
+# ============================================================
 # WEB SERVER
 # ============================================================
 
@@ -617,6 +939,27 @@ async def start_web_server():
     # Mini App
     app.router.add_post('/api/miniapp/order', api_miniapp_order)
     app.router.add_get('/api/miniapp/orders/{telegram_id}', api_miniapp_get_orders)
+
+    # Couriers
+    app.router.add_get('/api/couriers', api_get_couriers)
+    app.router.add_post('/api/couriers', api_create_courier)
+    app.router.add_put('/api/couriers/{id}', api_update_courier)
+    app.router.add_delete('/api/couriers/{id}', api_delete_courier)
+
+    # MFY
+    app.router.add_get('/api/mfy', api_get_mfy)
+    app.router.add_post('/api/mfy', api_create_mfy)
+    app.router.add_put('/api/mfy/{id}', api_update_mfy)
+    app.router.add_delete('/api/mfy/{id}', api_delete_mfy)
+
+    # Scheduled Notifications
+    app.router.add_get('/api/scheduled-notifications', api_get_scheduled_notifications)
+    app.router.add_post('/api/scheduled-notifications', api_create_scheduled_notification)
+    app.router.add_put('/api/scheduled-notifications/{id}', api_update_scheduled_notification)
+    app.router.add_delete('/api/scheduled-notifications/{id}', api_delete_scheduled_notification)
+
+    # Assign courier to order
+    app.router.add_post('/api/orders/{id}/assign-courier', api_assign_order_courier)
 
     # --- Static Pages ---
     static_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')

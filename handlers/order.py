@@ -231,6 +231,26 @@ async def confirm_order(callback: CallbackQuery, state: FSMContext):
         
         logger.info(f"Order #{order_id} successfully created for user {telegram_id}. Total: {total_price}")
         
+        # Get the assigned courier for this order
+        courier_tg_id = None
+        courier_name = None
+        mfy_name = None
+        try:
+            order_row = await models.fetch_row("""
+                SELECT o.id, c.telegram_id as courier_tg_id, c.name as courier_name, m.name as mfy_name
+                FROM orders o
+                JOIN users u ON o.user_id = u.id
+                LEFT JOIN mfy m ON u.mfy_id = m.id
+                LEFT JOIN couriers c ON o.courier_id = c.id
+                WHERE o.id = $1;
+            """, order_id)
+            if order_row:
+                courier_tg_id = order_row['courier_tg_id']
+                courier_name = order_row['courier_name']
+                mfy_name = order_row['mfy_name']
+        except Exception as err:
+            logger.error(f"Failed to fetch courier for order notification: {err}")
+
         # Success message
         await callback.message.edit_text(
             f"✅ Buyurtmangiz qabul qilindi.\n\n"
@@ -275,11 +295,16 @@ async def confirm_order(callback: CallbackQuery, state: FSMContext):
             qty_unit = "dona" if item['name'] == "Malako" else "kg"
             items_text += f"  - {item['name']}: {item['quantity']} {qty_unit}\n"
             
+        courier_info = f"**Kuryer:** {courier_name}\n" if courier_name else ""
+        mfy_info = f"**Mahalla (MFY):** {mfy_name} MFY\n" if mfy_name else ""
+
         admin_text = (
             f"🔔 **YANGI BUYURTMA KELIB TUSHDI!**\n\n"
             f"**Buyurtma raqami:** #{order_id}\n"
             f"**Mijoz:** {user['full_name']}\n"
             f"**Telefon:** {user['phone_number']}\n"
+            f"{mfy_info}"
+            f"{courier_info}"
             f"**Yetkazish vaqti:** 06:30 - 07:30 (Ertaga)\n\n"
             f"**Mahsulotlar:**\n{items_text}\n"
             f"💵 **Jami summa:** {int(total_price):,} so'm\n\n".replace(",", " ") +
@@ -292,6 +317,30 @@ async def confirm_order(callback: CallbackQuery, state: FSMContext):
                 logger.info(f"New order notification sent to admin {admin_id}")
             except Exception as notify_err:
                 logger.error(f"Failed to send order notification to admin {admin_id}: {notify_err}")
+        
+        # Send notification to courier
+        if courier_tg_id:
+            try:
+                loc_link = ""
+                if user.get("latitude") and user.get("longitude"):
+                    loc_link = f"\n📍 [Mijoz joylashuvi (Lokatsiya)](https://maps.google.com/?q={user['latitude']},{user['longitude']})"
+                
+                courier_text = (
+                    f"🚚 **YANGI BUYURTMA (Kuryer uchun)**\n\n"
+                    f"**Hudud (MFY):** {mfy_name} MFY\n"
+                    f"**Buyurtma:** #{order_id}\n"
+                    f"**Mijoz:** {user['full_name']}\n"
+                    f"**Telefon:** {user['phone_number']}\n"
+                    f"**Yetkazish vaqti:** 06:30 - 07:30 (Ertaga)\n\n"
+                    f"**Mahsulotlar:**\n{items_text}\n"
+                    f"💵 **Jami:** {int(total_price):,} so'm\n"
+                    f"{loc_link}"
+                ).replace(",", " ")
+                
+                await callback.bot.send_message(chat_id=courier_tg_id, text=courier_text, parse_mode="Markdown")
+                logger.info(f"New order notification sent to courier {courier_tg_id}")
+            except Exception as notify_err:
+                logger.error(f"Failed to send order notification to courier {courier_tg_id}: {notify_err}")
         
     except Exception as e:
         logger.error(f"Failed to confirm order for user {telegram_id}: {e}")
