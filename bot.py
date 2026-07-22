@@ -643,6 +643,9 @@ async def api_get_couriers(request):
         return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
     try:
         couriers = await models.get_all_couriers()
+        for c in couriers:
+            if c.get('created_at'):
+                c['created_at'] = c['created_at'].strftime("%Y-%m-%d %H:%M:%S")
         return web.json_response(couriers)
     except Exception as e:
         logger.error(f"api_get_couriers: {e}")
@@ -767,6 +770,8 @@ async def api_get_scheduled_notifications(request):
         for n in notifs:
             if n.get('last_sent_date'):
                 n['last_sent_date'] = n['last_sent_date'].strftime("%Y-%m-%d")
+            if n.get('created_at'):
+                n['created_at'] = n['created_at'].strftime("%Y-%m-%d %H:%M:%S")
         return web.json_response(notifs)
     except Exception as e:
         logger.error(f"api_get_scheduled_notifications: {e}")
