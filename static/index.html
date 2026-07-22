@@ -948,11 +948,17 @@ function logout() {
 
 // ==================== API ====================
 async function api(path, method='GET', body=null) {
-  const opts = { method, headers: { 'Authorization': 'Bearer ' + TOKEN } };
-  if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
-  const r = await fetch(BASE + path, opts);
-  if (r.status === 401) { logout(); return null; }
-  return r.json();
+  try {
+    const opts = { method, headers: { 'Authorization': 'Bearer ' + TOKEN } };
+    if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+    const r = await fetch(BASE + path, opts);
+    if (r.status === 401) { logout(); return null; }
+    return await r.json();
+  } catch (err) {
+    console.error("API error:", err);
+    showToast("Serverga ulanishda yoki tarmoqda xatolik yuz berdi", "error");
+    return null;
+  }
 }
 
 // ==================== INIT ====================
@@ -2164,9 +2170,11 @@ async function deleteCourier(id) {
 
 async function loadMfy() {
   const data = await api('/api/mfy');
-  if (data) {
+  if (data && Array.isArray(data)) {
     allMfyList = data;
     renderMfy();
+  } else if (data && data.error) {
+    showToast(data.error, 'error');
   }
 }
 
@@ -2265,9 +2273,11 @@ let allRemindersList = [];
 
 async function loadRemindersPage() {
   const data = await api('/api/scheduled-notifications');
-  if (data) {
+  if (data && Array.isArray(data)) {
     allRemindersList = data;
     renderReminders();
+  } else if (data && data.error) {
+    showToast(data.error, 'error');
   }
 }
 
