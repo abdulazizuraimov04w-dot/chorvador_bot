@@ -7,6 +7,7 @@ from aiohttp import web
 
 from database.connection import init_db_pool, close_db_pool
 from database.models import create_tables
+from database import models
 from handlers import registration, menu, order, admin
 from utils.logger import logger
 from utils.scheduler import scheduler_loop

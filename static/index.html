@@ -2054,16 +2054,20 @@ async function loadLogisticsPage() {
 
 async function loadCouriersListGlobally() {
   const data = await api('/api/couriers');
-  if (data) {
+  if (data && Array.isArray(data)) {
     allCouriersList = data;
+  } else if (data && data.error) {
+    showToast(data.error, 'error');
   }
 }
 
 async function loadCouriers() {
   const data = await api('/api/couriers');
-  if (data) {
+  if (data && Array.isArray(data)) {
     allCouriersList = data;
     renderCouriers();
+  } else if (data && data.error) {
+    showToast(data.error, 'error');
   }
 }
 
@@ -2200,9 +2204,11 @@ function openAddMfyModal() {
   
   const select = document.getElementById('mfy-courier-select');
   select.innerHTML = '<option value="">Biriktirilmagan</option>';
-  allCouriersList.forEach(c => {
-    select.innerHTML += `<option value="${c.id}">${esc(c.name)} (${esc(c.phone_number)})</option>`;
-  });
+  if (Array.isArray(allCouriersList)) {
+    allCouriersList.forEach(c => {
+      select.innerHTML += `<option value="${c.id}">${esc(c.name)} (${esc(c.phone_number)})</option>`;
+    });
+  }
   
   openModal('mfy-modal');
 }
@@ -2214,10 +2220,12 @@ function openEditMfyModal(id, name, courierId) {
   
   const select = document.getElementById('mfy-courier-select');
   select.innerHTML = '<option value="">Biriktirilmagan</option>';
-  allCouriersList.forEach(c => {
-    const selected = c.id === courierId ? 'selected' : '';
-    select.innerHTML += `<option value="${c.id}" ${selected}>${esc(c.name)} (${esc(c.phone_number)})</option>`;
-  });
+  if (Array.isArray(allCouriersList)) {
+    allCouriersList.forEach(c => {
+      const selected = c.id === courierId ? 'selected' : '';
+      select.innerHTML += `<option value="${c.id}" ${selected}>${esc(c.name)} (${esc(c.phone_number)})</option>`;
+    });
+  }
   
   openModal('mfy-modal');
 }
