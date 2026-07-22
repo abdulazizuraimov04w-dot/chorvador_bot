@@ -962,6 +962,7 @@ function initApp() {
   setInterval(updateClock, 1000);
   // Auto-refresh orders every 60s
   setInterval(() => { loadOrders(false); }, 60000);
+  loadCouriersListGlobally();
 }
 
 function updateClock() {
@@ -2040,6 +2041,439 @@ function drawStraightRoute(start, orders) {
     });
   });
   document.getElementById('route-status').textContent = '\u26a0\ufe0f API kalit yo\u2019q \u2014 to\u2019g\u2019ri chiziq ko\u2019rsatilmoqda';
+}
+
+// ==================== LOGISTICS (COURIERS & MFY) ====================
+let allCouriersList = [];
+let allMfyList = [];
+
+async function loadLogisticsPage() {
+  await loadCouriers();
+  await loadMfy();
+}
+
+async function loadCouriersListGlobally() {
+  const data = await api('/api/couriers');
+  if (data) {
+    allCouriersList = data;
+  }
+}
+
+async function loadCouriers() {
+  const data = await api('/api/couriers');
+  if (data) {
+    allCouriersList = data;
+    renderCouriers();
+  }
+}
+
+function renderCouriers() {
+  const tbody = document.getElementById('couriers-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = allCouriersList.length
+    ? allCouriersList.map(c => `
+      <tr style="border-bottom: 1px solid var(--border);">
+        <td style="padding:10px 5px;"><b>${esc(c.name)}</b></td>
+        <td style="padding:10px 5px;">${esc(c.phone_number)}</td>
+        <td style="padding:10px 5px;">${c.telegram_id || '—'}</td>
+        <td style="padding:10px 5px;">
+          <span style="font-size:11px;background:${c.is_active ? 'rgba(34,197,94,0.15);color:var(--green)' : 'rgba(239,68,68,0.15);color:var(--red)'};padding:2px 8px;border-radius:10px;">
+            ${c.is_active ? 'Faol' : 'Nofaol'}
+          </span>
+        </td>
+        <td style="padding:10px 5px;text-align:right;">
+          <div class="btn-row" style="display:inline-flex;gap:4px;">
+            <button class="action-btn" onclick="openEditCourierModal(${c.id}, '${esc(c.name)}', '${esc(c.phone_number)}', ${c.telegram_id || 'null'}, ${c.is_active})">✏️</button>
+            <button class="action-btn" style="background:rgba(239,68,68,0.1);color:var(--red);" onclick="deleteCourier(${c.id})">🗑️</button>
+          </div>
+        </td>
+      </tr>
+    `).join('')
+    : '<tr><td colspan="5"><div class="empty-state"><p>Kuryerlar topilmadi</p></div></td></tr>';
+}
+
+function openAddCourierModal() {
+  document.getElementById('courier-modal-title').textContent = 'Yangi kuryer';
+  document.getElementById('courier-id').value = '';
+  document.getElementById('courier-name').value = '';
+  document.getElementById('courier-phone').value = '';
+  document.getElementById('courier-tg-id').value = '';
+  document.getElementById('courier-status-group').style.display = 'none';
+  document.getElementById('courier-active').value = 'true';
+  openModal('courier-modal');
+}
+
+function openEditCourierModal(id, name, phone, tgId, isActive) {
+  document.getElementById('courier-modal-title').textContent = 'Kuryerni tahrirlash';
+  document.getElementById('courier-id').value = id;
+  document.getElementById('courier-name').value = name;
+  document.getElementById('courier-phone').value = phone;
+  document.getElementById('courier-tg-id').value = tgId !== null ? tgId : '';
+  document.getElementById('courier-status-group').style.display = 'block';
+  document.getElementById('courier-active').value = String(isActive);
+  openModal('courier-modal');
+}
+
+async function saveCourier() {
+  const id = document.getElementById('courier-id').value;
+  const name = document.getElementById('courier-name').value.trim();
+  const phone = document.getElementById('courier-phone').value.trim();
+  const tgIdVal = document.getElementById('courier-tg-id').value.trim();
+  const isActive = document.getElementById('courier-active').value === 'true';
+  
+  if (!name || !phone) {
+    showToast('Ism va telefon raqam bo\'sh bo\'lmasligi kerak!', 'error');
+    return;
+  }
+  
+  const payload = {
+    name: name,
+    phone_number: phone,
+    telegram_id: tgIdVal ? parseInt(tgIdVal) : null,
+    is_active: isActive
+  };
+  
+  let res;
+  if (id) {
+    res = await api(`/api/couriers/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload
+    });
+  } else {
+    res = await api('/api/couriers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload
+    });
+  }
+  
+  if (res && res.success) {
+    showToast('Kuryer muvaffaqiyatli saqlandi!', 'success');
+    closeModal('courier-modal');
+    loadCouriers();
+    loadMfy();
+  }
+}
+
+async function deleteCourier(id) {
+  if (!confirm('Haqiqatan ham bu kuryerni o\'chirib tashlamoqchimisiz?')) return;
+  const res = await api(`/api/couriers/${id}`, { method: 'DELETE' });
+  if (res && res.success) {
+    showToast('Kuryer o\'chirildi!', 'success');
+    loadCouriers();
+    loadMfy();
+  }
+}
+
+async function loadMfy() {
+  const data = await api('/api/mfy');
+  if (data) {
+    allMfyList = data;
+    renderMfy();
+  }
+}
+
+function renderMfy() {
+  const tbody = document.getElementById('mfy-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = allMfyList.length
+    ? allMfyList.map(m => `
+      <tr style="border-bottom: 1px solid var(--border);">
+        <td style="padding:10px 5px;"><b>${esc(m.name)} MFY</b></td>
+        <td style="padding:10px 5px;">${esc(m.courier_name || 'Biriktirilmagan')}</td>
+        <td style="padding:10px 5px;text-align:right;">
+          <div class="btn-row" style="display:inline-flex;gap:4px;">
+            <button class="action-btn" onclick="openEditMfyModal(${m.id}, '${esc(m.name)}', ${m.courier_id || 'null'})">✏️</button>
+            <button class="action-btn" style="background:rgba(239,68,68,0.1);color:var(--red);" onclick="deleteMfy(${m.id})">🗑️</button>
+          </div>
+        </td>
+      </tr>
+    `).join('')
+    : '<tr><td colspan="3"><div class="empty-state"><p>Mahallalar topilmadi</p></div></td></tr>';
+}
+
+function openAddMfyModal() {
+  document.getElementById('mfy-modal-title').textContent = 'Yangi mahalla (MFY)';
+  document.getElementById('mfy-id-input').value = '';
+  document.getElementById('mfy-name-input').value = '';
+  
+  const select = document.getElementById('mfy-courier-select');
+  select.innerHTML = '<option value="">Biriktirilmagan</option>';
+  allCouriersList.forEach(c => {
+    select.innerHTML += `<option value="${c.id}">${esc(c.name)} (${esc(c.phone_number)})</option>`;
+  });
+  
+  openModal('mfy-modal');
+}
+
+function openEditMfyModal(id, name, courierId) {
+  document.getElementById('mfy-modal-title').textContent = 'Mahallani tahrirlash';
+  document.getElementById('mfy-id-input').value = id;
+  document.getElementById('mfy-name-input').value = name;
+  
+  const select = document.getElementById('mfy-courier-select');
+  select.innerHTML = '<option value="">Biriktirilmagan</option>';
+  allCouriersList.forEach(c => {
+    const selected = c.id === courierId ? 'selected' : '';
+    select.innerHTML += `<option value="${c.id}" ${selected}>${esc(c.name)} (${esc(c.phone_number)})</option>`;
+  });
+  
+  openModal('mfy-modal');
+}
+
+async function saveMfy() {
+  const id = document.getElementById('mfy-id-input').value;
+  const name = document.getElementById('mfy-name-input').value.trim();
+  const courierIdVal = document.getElementById('mfy-courier-select').value;
+  
+  if (!name) {
+    showToast('Mahalla nomi bo\'sh bo\'lmasligi kerak!', 'error');
+    return;
+  }
+  
+  const payload = {
+    name: name,
+    courier_id: courierIdVal ? parseInt(courierIdVal) : null
+  };
+  
+  let res;
+  if (id) {
+    res = await api(`/api/mfy/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload
+    });
+  } else {
+    res = await api('/api/mfy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload
+    });
+  }
+  
+  if (res && res.success) {
+    showToast('Mahalla muvaffaqiyatli saqlandi!', 'success');
+    closeModal('mfy-modal');
+    loadMfy();
+  }
+}
+
+async function deleteMfy(id) {
+  if (!confirm('Haqiqatan ham bu mahallani o\'chirib tashlamoqchimisiz?')) return;
+  const res = await api(`/api/mfy/${id}`, { method: 'DELETE' });
+  if (res && res.success) {
+    showToast('Mahalla o\'chirildi!', 'success');
+    loadMfy();
+  }
+}
+
+// ==================== AUTO REMINDERS ====================
+let allRemindersList = [];
+
+async function loadRemindersPage() {
+  const data = await api('/api/scheduled-notifications');
+  if (data) {
+    allRemindersList = data;
+    renderReminders();
+  }
+}
+
+function renderReminders() {
+  const tbody = document.getElementById('reminders-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = allRemindersList.length
+    ? allRemindersList.map(r => {
+      const timeStr = `${String(r.send_hour).padStart(2,'0')}:${String(r.send_minute).padStart(2,'0')}`;
+      let mediaHtml = '—';
+      if (r.media_url) {
+        mediaHtml = r.media_type === 'video' 
+          ? `<video src="${esc(r.media_url)}" style="max-height:40px;border-radius:4px;" muted controls></video>`
+          : `<img src="${esc(r.media_url)}" style="max-height:40px;border-radius:4px;">`;
+      }
+      return `
+        <tr style="border-bottom: 1px solid var(--border);">
+          <td style="padding:10px 5px;"><b>${esc(r.title)}</b></td>
+          <td style="padding:10px 5px;"><div style="max-width:250px;max-height:60px;overflow-y:auto;font-size:11px;line-height:1.4;">${esc(r.text)}</div></td>
+          <td style="padding:10px 5px;"><b>${timeStr}</b><br><span style="font-size:9px;color:var(--muted)">Oxirgi: ${r.last_sent_date || 'Yuborilmagan'}</span></td>
+          <td style="padding:10px 5px;">${mediaHtml}</td>
+          <td style="padding:10px 5px;">
+            <span style="font-size:11px;background:${r.is_active ? 'rgba(34,197,94,0.15);color:var(--green)' : 'rgba(239,68,68,0.15);color:var(--red)'};padding:2px 8px;border-radius:10px;">
+              ${r.is_active ? 'Faol' : 'Nofaol'}
+            </span>
+          </td>
+          <td style="padding:10px 5px;text-align:right;">
+            <div class="btn-row" style="display:inline-flex;gap:4px;">
+              <button class="action-btn" onclick="openEditReminderModal(${r.id}, '${esc(r.title)}', ${r.send_hour}, ${r.send_minute}, '${esc(r.text || '')}', '${esc(r.media_url || '')}', '${esc(r.media_type || '')}', ${r.is_active})">✏️</button>
+              <button class="action-btn" style="background:rgba(239,68,68,0.1);color:var(--red);" onclick="deleteReminder(${r.id})">🗑️</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('')
+    : '<tr><td colspan="6"><div class="empty-state"><p>Rejalashtirilgan eslatmalar topilmadi</p></div></td></tr>';
+}
+
+function openAddReminderModal() {
+  document.getElementById('reminder-modal-title').textContent = 'Yangi avtomatik eslatma';
+  document.getElementById('reminder-id-input').value = '';
+  document.getElementById('reminder-title-input').value = '';
+  document.getElementById('reminder-hour-input').value = '6';
+  document.getElementById('reminder-minute-input').value = '0';
+  document.getElementById('reminder-text-input').value = '';
+  document.getElementById('reminder-media-type').value = '';
+  document.getElementById('reminder-media-url-input').value = '';
+  document.getElementById('reminder-media-preview').innerHTML = '';
+  document.getElementById('reminder-media-url-group').style.display = 'none';
+  document.getElementById('reminder-status-group').style.display = 'none';
+  document.getElementById('reminder-active-input').value = 'true';
+  openModal('reminder-modal');
+}
+
+function openEditReminderModal(id, title, hour, minute, text, mediaUrl, mediaType, isActive) {
+  document.getElementById('reminder-modal-title').textContent = 'Eslatmani tahrirlash';
+  document.getElementById('reminder-id-input').value = id;
+  document.getElementById('reminder-title-input').value = title;
+  document.getElementById('reminder-hour-input').value = hour;
+  document.getElementById('reminder-minute-input').value = minute;
+  document.getElementById('reminder-text-input').value = text;
+  
+  const mType = document.getElementById('reminder-media-type');
+  mType.value = mediaType;
+  
+  const urlInput = document.getElementById('reminder-media-url-input');
+  urlInput.value = mediaUrl;
+  
+  toggleReminderMediaInputs();
+  updateReminderMediaPreview(mediaUrl, mediaType);
+  
+  document.getElementById('reminder-status-group').style.display = 'block';
+  document.getElementById('reminder-active-input').value = String(isActive);
+  
+  openModal('reminder-modal');
+}
+
+function toggleReminderMediaInputs() {
+  const type = document.getElementById('reminder-media-type').value;
+  const group = document.getElementById('reminder-media-url-group');
+  if (type) {
+    group.style.display = 'block';
+  } else {
+    group.style.display = 'none';
+    document.getElementById('reminder-media-url-input').value = '';
+    document.getElementById('reminder-media-preview').innerHTML = '';
+  }
+}
+
+async function uploadReminderMedia(input) {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const previewDiv = document.getElementById('reminder-media-preview');
+  previewDiv.innerHTML = '<div style="font-size:11px;color:var(--muted)">Yuklanmoqda...</div>';
+  
+  const res = await fetch('/api/upload', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + TOKEN },
+    body: formData
+  });
+  
+  if (res.ok) {
+    const d = await res.json();
+    if (d.url) {
+      document.getElementById('reminder-media-url-input').value = d.url;
+      const type = document.getElementById('reminder-media-type').value;
+      updateReminderMediaPreview(d.url, type);
+      showToast('Media yuklandi!', 'success');
+    }
+  } else {
+    previewDiv.innerHTML = '<span style="color:var(--red);font-size:11px;">Yuklashda xato!</span>';
+  }
+}
+
+function updateReminderMediaPreview(url, type) {
+  const previewDiv = document.getElementById('reminder-media-preview');
+  if (!url) {
+    previewDiv.innerHTML = '';
+    return;
+  }
+  if (type === 'video') {
+    previewDiv.innerHTML = `<video src="${esc(url)}" style="max-width:100%;max-height:100px;border-radius:4px;" controls muted></video>`;
+  } else if (type === 'photo') {
+    previewDiv.innerHTML = `<img src="${esc(url)}" style="max-width:100%;max-height:100px;border-radius:4px;">`;
+  } else {
+    previewDiv.innerHTML = '';
+  }
+}
+
+async function saveReminder() {
+  const id = document.getElementById('reminder-id-input').value;
+  const title = document.getElementById('reminder-title-input').value.trim();
+  const hour = document.getElementById('reminder-hour-input').value;
+  const minute = document.getElementById('reminder-minute-input').value;
+  const text = document.getElementById('reminder-text-input').value.trim();
+  const mediaType = document.getElementById('reminder-media-type').value;
+  const mediaUrl = document.getElementById('reminder-media-url-input').value.trim();
+  const isActive = document.getElementById('reminder-active-input').value === 'true';
+  
+  if (!title || !text) {
+    showToast('Sarlavha va matn bo\'sh bo\'lmasligi kerak!', 'error');
+    return;
+  }
+  
+  const payload = {
+    title: title,
+    text: text,
+    media_type: mediaType || null,
+    media_url: mediaUrl || null,
+    send_hour: parseInt(hour),
+    send_minute: parseInt(minute),
+    is_active: isActive
+  };
+  
+  let res;
+  if (id) {
+    res = await api(`/api/scheduled-notifications/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload
+    });
+  } else {
+    res = await api('/api/scheduled-notifications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload
+    });
+  }
+  
+  if (res && res.success) {
+    showToast('Eslatma muvaffaqiyatli saqlandi!', 'success');
+    closeModal('reminder-modal');
+    loadRemindersPage();
+  }
+}
+
+async function deleteReminder(id) {
+  if (!confirm('Haqiqatan ham bu avtomatik eslatmani o\'chirib tashlamoqchimisiz?')) return;
+  const res = await api(`/api/scheduled-notifications/${id}`, { method: 'DELETE' });
+  if (res && res.success) {
+    showToast('Eslatma o\'chirildi!', 'success');
+    loadRemindersPage();
+  }
+}
+
+async function assignCourier(orderId, courierId) {
+  const res = await api(`/api/orders/${orderId}/assign-courier`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: { courier_id: courierId ? parseInt(courierId) : null }
+  });
+  if (res && res.success) {
+    showToast('Kuryer buyurtmaga biriktirildi!', 'success');
+    loadOrders();
+  }
 }
 
 // ==================== AUTO LOGIN (if token saved) ====================
