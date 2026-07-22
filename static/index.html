@@ -2139,17 +2139,9 @@ async function saveCourier() {
   
   let res;
   if (id) {
-    res = await api(`/api/couriers/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: payload
-    });
+    res = await api(`/api/couriers/${id}`, 'PUT', payload);
   } else {
-    res = await api('/api/couriers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: payload
-    });
+    res = await api('/api/couriers', 'POST', payload);
   }
   
   if (res && res.success) {
@@ -2162,7 +2154,7 @@ async function saveCourier() {
 
 async function deleteCourier(id) {
   if (!confirm('Haqiqatan ham bu kuryerni o\'chirib tashlamoqchimisiz?')) return;
-  const res = await api(`/api/couriers/${id}`, { method: 'DELETE' });
+  const res = await api(`/api/couriers/${id}`, 'DELETE');
   if (res && res.success) {
     showToast('Kuryer o\'chirildi!', 'success');
     loadCouriers();
@@ -2247,17 +2239,9 @@ async function saveMfy() {
   
   let res;
   if (id) {
-    res = await api(`/api/mfy/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: payload
-    });
+    res = await api(`/api/mfy/${id}`, 'PUT', payload);
   } else {
-    res = await api('/api/mfy', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: payload
-    });
+    res = await api('/api/mfy', 'POST', payload);
   }
   
   if (res && res.success) {
@@ -2269,7 +2253,7 @@ async function saveMfy() {
 
 async function deleteMfy(id) {
   if (!confirm('Haqiqatan ham bu mahallani o\'chirib tashlamoqchimisiz?')) return;
-  const res = await api(`/api/mfy/${id}`, { method: 'DELETE' });
+  const res = await api(`/api/mfy/${id}`, 'DELETE');
   if (res && res.success) {
     showToast('Mahalla o\'chirildi!', 'success');
     loadMfy();
@@ -2443,17 +2427,9 @@ async function saveReminder() {
   
   let res;
   if (id) {
-    res = await api(`/api/scheduled-notifications/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: payload
-    });
+    res = await api(`/api/scheduled-notifications/${id}`, 'PUT', payload);
   } else {
-    res = await api('/api/scheduled-notifications', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: payload
-    });
+    res = await api('/api/scheduled-notifications', 'POST', payload);
   }
   
   if (res && res.success) {
@@ -2465,7 +2441,7 @@ async function saveReminder() {
 
 async function deleteReminder(id) {
   if (!confirm('Haqiqatan ham bu avtomatik eslatmani o\'chirib tashlamoqchimisiz?')) return;
-  const res = await api(`/api/scheduled-notifications/${id}`, { method: 'DELETE' });
+  const res = await api(`/api/scheduled-notifications/${id}`, 'DELETE');
   if (res && res.success) {
     showToast('Eslatma o\'chirildi!', 'success');
     loadRemindersPage();
@@ -2473,11 +2449,7 @@ async function deleteReminder(id) {
 }
 
 async function assignCourier(orderId, courierId) {
-  const res = await api(`/api/orders/${orderId}/assign-courier`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: { courier_id: courierId ? parseInt(courierId) : null }
-  });
+  const res = await api(`/api/orders/${orderId}/assign-courier`, 'POST', { courier_id: courierId ? parseInt(courierId) : null });
   if (res && res.success) {
     showToast('Kuryer buyurtmaga biriktirildi!', 'success');
     loadOrders();
