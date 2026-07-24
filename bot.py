@@ -202,19 +202,81 @@ async def api_get_products(request):
 
 
 
+# --- CATEGORY API ENDPOINTS ---
+
+async def api_get_categories(request):
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        categories = await models.get_all_categories()
+        for c in categories:
+            if c.get('created_at'):
+                c['created_at'] = c['created_at'].strftime("%Y-%m-%d %H:%M:%S")
+        return web.json_response(categories)
+    except Exception as e:
+        logger.error(f"api_get_categories: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+async def api_create_category(request):
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        data = await request.json()
+        name = data.get("name", "").strip()
+        icon = data.get("icon", "🛍️").strip()
+        sort_order = int(data.get("sort_order", 0))
+        if not name:
+            return web.json_response({"error": "Kategoriya nomi kiritilishi shart!"}, status=400)
+        cat_id = await models.create_category(name, icon, sort_order)
+        return web.json_response({"success": True, "id": cat_id})
+    except Exception as e:
+        logger.error(f"api_create_category: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+async def api_update_category(request):
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        cat_id = int(request.match_info['id'])
+        data = await request.json()
+        name = data.get("name", "").strip()
+        icon = data.get("icon", "🛍️").strip()
+        sort_order = int(data.get("sort_order", 0))
+        if not name:
+            return web.json_response({"error": "Kategoriya nomi kiritilishi shart!"}, status=400)
+        await models.update_category(cat_id, name, icon, sort_order)
+        return web.json_response({"success": True})
+    except Exception as e:
+        logger.error(f"api_update_category: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+async def api_delete_category(request):
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        cat_id = int(request.match_info['id'])
+        await models.delete_category(cat_id)
+        return web.json_response({"success": True})
+    except Exception as e:
+        logger.error(f"api_delete_category: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+# --- PRODUCT API ENDPOINTS ---
+
 async def api_add_product(request):
     if not is_authorized(request):
         return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
     try:
         from decimal import Decimal
-        from database import models
         data = await request.json()
         name = data.get("name", "").strip()
         price = data.get("price")
         image_url = data.get("image_url")
+        category_id = data.get("category_id")
         if not name or price is None:
             return web.json_response({"error": "Nom va narx kiritilishi shart!"}, status=400)
-        product = await models.add_product(name, Decimal(str(price)), image_url)
+        cat_id = int(category_id) if category_id else None
+        product = await models.add_product(name, Decimal(str(price)), image_url, cat_id)
         product['price'] = float(product['price'])
         if product.get('created_at'):
             product['created_at'] = product['created_at'].strftime("%Y-%m-%d %H:%M")
@@ -229,16 +291,17 @@ async def api_update_product(request):
         return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
     try:
         from decimal import Decimal
-        from database import models
         product_id = int(request.match_info['id'])
         data = await request.json()
         name = data.get("name", "").strip()
         price = data.get("price")
         image_url = data.get("image_url")
+        category_id = data.get("category_id")
         if not name or price is None:
             return web.json_response({"error": "Nom va narx kiritilishi shart!"}, status=400)
-        await models.update_product(product_id, name, Decimal(str(price)), image_url)
-        logger.info(f"Mahsulot #{product_id} yangilandi: {name}, {price}, {image_url}")
+        cat_id = int(category_id) if category_id else None
+        await models.update_product(product_id, name, Decimal(str(price)), image_url, cat_id)
+        logger.info(f"Mahsulot #{product_id} yangilandi: {name}, {price}")
         return web.json_response({"success": True})
     except Exception as e:
         logger.error(f"api_update_product: {e}")
@@ -920,6 +983,12 @@ async def start_web_server():
     app.router.add_post('/api/orders/{id}/status', api_update_order_status)
     app.router.add_post('/api/orders/{id}/arrived', api_order_arrived)
 
+    # Categories
+    app.router.add_get('/api/categories', api_get_categories)
+    app.router.add_post('/api/categories', api_create_category)
+    app.router.add_put('/api/categories/{id}', api_update_category)
+    app.router.add_delete('/api/categories/{id}', api_delete_category)
+
     # Products
     app.router.add_get('/api/products', api_get_products)
     app.router.add_post('/api/products', api_add_product)
@@ -1020,12 +1089,12 @@ async def main():
         await start_web_server()
         try:
             await bot.set_my_description(
-                "Chorvador botiga xush kelibsiz!\n\n"
-                "Bu bot orqali siz tabiiy va sifatli sut hamda sut mahsulotlariga (sut, qatiq, suzma, pishloq, sariyog' va boshqalar) uyingizdan turib buyurtma berishingiz mumkin. Biz esa yetkazib beramiz.\n"
+                "🍊 Mandarin Supermarket botiga xush kelibsiz!\n\n"
+                "Bu bot orqali siz sarxil meva-chevalar, ichimliklar, oziq-ovqat va ro'zg'or mahsulotlariga uyingizdan turib qulay buyurtma berishingiz mumkin. Kuryerlarimiz mahsulotlarni tez va sifatli yetkazib beradi.\n"
                 "Buyurtma berish uchun botni ishga tushiring!"
             )
             await bot.set_my_short_description(
-                "Tabiiy sut mahsulotlarini uyingizga yetkazib berish boti"
+                "🍊 Mandarin Supermarket - oziq-ovqat va ro'zg'or mahsulotlarini uyingizga yetkazib berish boti"
             )
             logger.info("Bot ta'rifi (description) muvaffaqiyatli yangilandi.")
         except Exception as desc_err:

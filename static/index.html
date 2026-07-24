@@ -343,12 +343,13 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
   <!-- SIDEBAR -->
   <aside class="sidebar">
     <div class="logo">
-      <div class="logo-title"><div class="logo-icon">🥛</div><div><div>Chorvador</div><div class="logo-sub">Admin Panel</div></div></div>
+      <div class="logo-title"><div class="logo-icon">🍊</div><div><div>Mandarin</div><div class="logo-sub">Supermarket Admin</div></div></div>
     </div>
     <nav class="nav">
       <button class="nav-item active" onclick="navigate('dashboard',this)"><span class="icon">📊</span> Statistika</button>
       <button class="nav-item" onclick="navigate('orders',this)"><span class="icon">📦</span> Buyurtmalar <span class="nav-badge" id="pending-badge" style="display:none">0</span></button>
-      <button class="nav-item" onclick="navigate('products',this)"><span class="icon">🧀</span> Mahsulotlar</button>
+      <button class="nav-item" onclick="navigate('categories',this)"><span class="icon">🗂️</span> Kategoriyalar</button>
+      <button class="nav-item" onclick="navigate('products',this)"><span class="icon">🛒</span> Mahsulotlar</button>
       <button class="nav-item" onclick="navigate('customers',this)"><span class="icon">👥</span> Mijozlar</button>
       <button class="nav-item" onclick="navigate('broadcast',this)"><span class="icon">📢</span> Xabar yuborish</button>
       <button class="nav-item" onclick="navigate('payments',this)"><span class="icon">💰</span> To'lovlar</button>
@@ -431,6 +432,31 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
             <table>
               <thead><tr><th>#</th><th>Mijoz</th><th>Mahsulotlar</th><th>Summa</th><th>Sana</th><th>Status</th><th>Amal</th></tr></thead>
               <tbody id="orders-body"><tr><td colspan="7"><div class="loader"><div class="spinner"></div></div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- CATEGORIES -->
+      <div class="page" id="page-categories">
+        <div class="section-header">
+          <div class="card-title">Kategoriyalar boshqaruvi</div>
+          <button type="button" class="add-btn" onclick="openAddCategoryModal()">+ Yangi kategoriya</button>
+        </div>
+        <div class="card" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;">
+          <div style="overflow-x:auto;">
+            <table class="table" style="width:100%;border-collapse:collapse;text-align:left;">
+              <thead>
+                <tr style="border-bottom:1px solid var(--border);color:var(--muted);font-size:12px;">
+                  <th style="padding:10px 5px;">Belgi</th>
+                  <th style="padding:10px 5px;">Kategoriya Nomi</th>
+                  <th style="padding:10px 5px;">Tartib</th>
+                  <th style="padding:10px 5px;text-align:right;">Amallar</th>
+                </tr>
+              </thead>
+              <tbody id="categories-table-body">
+                <!-- JS dynamically populates -->
+              </tbody>
             </table>
           </div>
         </div>
@@ -756,14 +782,45 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
   </div>
 </div>
 
+<!-- CATEGORY MODAL -->
+<div class="modal-overlay" id="category-modal">
+  <div class="modal">
+    <button type="button" class="modal-close" onclick="closeModal('category-modal')">×</button>
+    <div class="modal-title" id="category-modal-title">Yangi Kategoriya</div>
+    <input type="hidden" id="category-id-input">
+    <div class="form-group">
+      <label class="form-label">Kategoriya Nomi</label>
+      <input type="text" class="form-input" id="category-name-input" placeholder="Masalan: Mevalar va Sabzavotlar">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Emoji / Icon</label>
+      <input type="text" class="form-input" id="category-icon-input" placeholder="Masalan: 🥭">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Tartib raqami (Sort Order)</label>
+      <input type="number" class="form-input" id="category-order-input" placeholder="0">
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-cancel" onclick="closeModal('category-modal')">Bekor</button>
+      <button type="button" class="btn-save" onclick="saveCategory()">Saqlash</button>
+    </div>
+  </div>
+</div>
+
 <!-- ADD PRODUCT MODAL -->
 <div class="modal-overlay" id="product-modal">
   <div class="modal">
-    <button class="modal-close" onclick="closeModal('product-modal')">×</button>
+    <button type="button" class="modal-close" onclick="closeModal('product-modal')">×</button>
     <div class="modal-title" id="product-modal-title">Yangi mahsulot</div>
     <div class="form-group">
+      <label class="form-label">Kategoriya</label>
+      <select class="form-input" id="prod-category">
+        <!-- JS dynamically populates -->
+      </select>
+    </div>
+    <div class="form-group">
       <label class="form-label">Nomi</label>
-      <input type="text" class="form-input" id="prod-name" placeholder="Masalan: Qatiq" oninput="if(!document.getElementById('prod-image-url').value) updateImagePreview('', this.value)">
+      <input type="text" class="form-input" id="prod-name" placeholder="Masalan: Mandarin (1 kg)" oninput="if(!document.getElementById('prod-image-url').value) updateImagePreview('', this.value)">
     </div>
     <div class="form-group">
       <label class="form-label">Narxi (so'm)</label>
@@ -969,6 +1026,7 @@ function initApp() {
   // Auto-refresh orders every 60s
   setInterval(() => { loadOrders(false); }, 60000);
   loadCouriersListGlobally();
+  loadCategoriesListGlobally();
 }
 
 function updateClock() {
@@ -984,9 +1042,10 @@ function navigate(page, btn) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   if (btn) btn.classList.add('active');
   document.getElementById('page-' + page).classList.add('active');
-  const titles = { dashboard:'Statistika', orders:'Buyurtmalar', products:'Mahsulotlar', customers:'Mijozlar', broadcast:'Xabar yuborish', payments:'To\'lovlar', map:'🗺️ Yetkazish xaritasi', miniapp:'📱 Mini App', settings:'⏰ Eslatma sozlamalari' };
+  const titles = { dashboard:'Statistika', orders:'Buyurtmalar', categories:'🗂️ Kategoriyalar boshqaruvi', products:'Mahsulotlar', customers:'Mijozlar', broadcast:'Xabar yuborish', payments:'To\'lovlar', map:'🗺️ Yetkazish xaritasi', miniapp:'📱 Mini App', settings:'⏰ Eslatma sozlamalari' };
   document.getElementById('page-title').textContent = titles[page] || page;
   if (page === 'orders') loadOrders();
+  if (page === 'categories') loadCategoriesPage();
   if (page === 'products') loadProducts();
   if (page === 'customers') loadCustomers();
   if (page === 'broadcast') loadBroadcastInfo();
@@ -1290,6 +1349,117 @@ async function notifyArrived() {
   else showToast('Xatolik yuz berdi', 'error');
 }
 
+// ==================== CATEGORIES ====================
+let allCategoriesList = [];
+
+async function loadCategoriesListGlobally() {
+  const data = await api('/api/categories');
+  if (data && Array.isArray(data)) {
+    allCategoriesList = data;
+    populateProductCategorySelect();
+  }
+}
+
+async function loadCategoriesPage() {
+  const data = await api('/api/categories');
+  if (data && Array.isArray(data)) {
+    allCategoriesList = data;
+    renderCategories();
+    populateProductCategorySelect();
+  } else if (data && data.error) {
+    showToast(data.error, 'error');
+  }
+}
+
+function renderCategories() {
+  const tbody = document.getElementById('categories-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = allCategoriesList.length
+    ? allCategoriesList.map(c => `
+      <tr style="border-bottom: 1px solid var(--border);">
+        <td style="padding:10px 5px;font-size:18px;">${c.icon || '🛍️'}</td>
+        <td style="padding:10px 5px;"><b>${esc(c.name)}</b></td>
+        <td style="padding:10px 5px;">${c.sort_order || 0}</td>
+        <td style="padding:10px 5px;text-align:right;">
+          <div class="btn-row" style="display:inline-flex;gap:4px;">
+            <button type="button" class="action-btn" onclick="openEditCategoryModal(${c.id}, '${esc(c.name)}', '${esc(c.icon || '🛍️')}', ${c.sort_order || 0})">✏️</button>
+            <button type="button" class="action-btn" style="background:rgba(239,68,68,0.1);color:var(--red);" onclick="deleteCategory(${c.id})">🗑️</button>
+          </div>
+        </td>
+      </tr>
+    `).join('')
+    : '<tr><td colspan="4"><div class="empty-state"><p>Kategoriyalar topilmadi</p></div></td></tr>';
+}
+
+function openAddCategoryModal() {
+  document.getElementById('category-modal-title').textContent = 'Yangi Kategoriya';
+  document.getElementById('category-id-input').value = '';
+  document.getElementById('category-name-input').value = '';
+  document.getElementById('category-icon-input').value = '🛍️';
+  document.getElementById('category-order-input').value = '0';
+  openModal('category-modal');
+}
+
+function openEditCategoryModal(id, name, icon, sortOrder) {
+  document.getElementById('category-modal-title').textContent = 'Kategoriyani tahrirlash';
+  document.getElementById('category-id-input').value = id;
+  document.getElementById('category-name-input').value = name;
+  document.getElementById('category-icon-input').value = icon;
+  document.getElementById('category-order-input').value = sortOrder;
+  openModal('category-modal');
+}
+
+async function saveCategory() {
+  const id = document.getElementById('category-id-input').value;
+  const name = document.getElementById('category-name-input').value.trim();
+  const icon = document.getElementById('category-icon-input').value.trim();
+  const sortOrder = document.getElementById('category-order-input').value;
+
+  if (!name) {
+    showToast('Kategoriya nomi bo\'sh bo\'lmasligi kerak!', 'error');
+    return;
+  }
+
+  const payload = {
+    name: name,
+    icon: icon || '🛍️',
+    sort_order: parseInt(sortOrder) || 0
+  };
+
+  let res;
+  if (id) {
+    res = await api(`/api/categories/${id}`, 'PUT', payload);
+  } else {
+    res = await api('/api/categories', 'POST', payload);
+  }
+
+  if (res && res.success) {
+    showToast('Kategoriya saqlandi!', 'success');
+    closeModal('category-modal');
+    loadCategoriesPage();
+  }
+}
+
+async function deleteCategory(id) {
+  if (!confirm('Haqiqatan ham bu kategoriyani o\'chirib tashlamoqchimisiz?')) return;
+  const res = await api(`/api/categories/${id}`, 'DELETE');
+  if (res && res.success) {
+    showToast('Kategoriya o\'chirildi!', 'success');
+    loadCategoriesPage();
+  }
+}
+
+function populateProductCategorySelect() {
+  const select = document.getElementById('prod-category');
+  if (!select) return;
+  select.innerHTML = '<option value="">Biriktirilmagan (Kategoriyasiz)</option>';
+  if (Array.isArray(allCategoriesList)) {
+    allCategoriesList.forEach(c => {
+      select.innerHTML += `<option value="${c.id}">${c.icon || '🛍️'} ${esc(c.name)}</option>`;
+    });
+  }
+}
+
 // ==================== PRODUCTS ====================
 async function loadProducts() {
   document.getElementById('products-grid').innerHTML = '<div class="loader"><div class="spinner"></div></div>';
@@ -1380,9 +1550,11 @@ async function uploadProductImage(input) {
 
 function openAddProduct() {
   editingProductId = null;
+  populateProductCategorySelect();
   document.getElementById('product-modal-title').textContent = 'Yangi mahsulot';
   document.getElementById('prod-name').value = '';
   document.getElementById('prod-price').value = '';
+  document.getElementById('prod-category').value = '';
   document.getElementById('prod-image-url').value = '';
   document.getElementById('prod-file-input').value = '';
   updateImagePreview('');
@@ -1393,9 +1565,11 @@ function openEditProduct(id) {
   editingProductId = id;
   const p = allProducts.find(x => x.id === id);
   if (!p) return;
+  populateProductCategorySelect();
   document.getElementById('product-modal-title').textContent = 'Mahsulotni tahrirlash';
   document.getElementById('prod-name').value = p.name;
   document.getElementById('prod-price').value = p.price;
+  document.getElementById('prod-category').value = p.category_id || '';
   document.getElementById('prod-image-url').value = p.image_url || '';
   document.getElementById('prod-file-input').value = '';
   updateImagePreview(p.image_url || '', p.name);
@@ -1405,13 +1579,16 @@ function openEditProduct(id) {
 async function saveProduct() {
   const name = document.getElementById('prod-name').value.trim();
   const price = parseFloat(document.getElementById('prod-price').value);
+  const categoryIdVal = document.getElementById('prod-category').value;
   const image_url = document.getElementById('prod-image-url').value.trim() || null;
+  const category_id = categoryIdVal ? parseInt(categoryIdVal) : null;
+
   if (!name || isNaN(price) || price <= 0) { showToast('Iltimos, barcha maydonlarni to\'ldiring', 'error'); return; }
   let r;
   if (editingProductId) {
-    r = await api(`/api/products/${editingProductId}`, 'PUT', { name, price, image_url });
+    r = await api(`/api/products/${editingProductId}`, 'PUT', { name, price, image_url, category_id });
   } else {
-    r = await api('/api/products', 'POST', { name, price, image_url });
+    r = await api('/api/products', 'POST', { name, price, image_url, category_id });
   }
   if (r?.success || r?.id || r?.product) {
     showToast(editingProductId ? 'Mahsulot yangilandi!' : 'Mahsulot qo\'shildi!', 'success');

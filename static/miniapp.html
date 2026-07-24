@@ -127,6 +127,9 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .add-btn { width:100%; padding:8px 0; background:var(--accent); color:#fff; border:none; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer; transition:.15s; margin-top:4px; }
 .add-btn:active { transform:scale(0.97); }
 
+.cat-tab-btn { padding: 7px 14px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: .15s; flex-shrink: 0; }
+.cat-tab-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
 /* CART */
 .cart-empty { text-align:center; padding:60px 24px; }
 .cart-empty .emoji { font-size:56px; margin-bottom:12px; }
@@ -226,15 +229,29 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 <!-- CATALOG PAGE -->
 <div class="page active" id="page-catalog">
   <div class="topnav">
-    <div class="topnav-title">🥛 Mahsulotlar</div>
+    <div class="topnav-title">🍊 Mandarin</div>
     <button class="cart-btn" onclick="goPage('cart')" id="cart-topbtn" style="display:none">
       🛒 Savat <span class="cart-count" id="cart-count-top">0</span>
     </button>
   </div>
-  <div class="catalog-header">
-    <h2>Sut mahsulotlari</h2>
-    <p>Toza va sifatli, har kuni yetkazib beramiz</p>
+  <div class="catalog-header" style="padding-bottom:6px;">
+    <h2>Mandarin Supermarket</h2>
+    <p>Oziq-ovqat va ro'zg'or mahsulotlari</p>
   </div>
+
+  <!-- SEARCH BAR -->
+  <div style="padding:0 16px 10px;">
+    <div style="position:relative;display:flex;align-items:center;">
+      <span style="position:absolute;left:12px;font-size:15px;color:var(--muted)">🔍</span>
+      <input type="text" id="miniapp-search" placeholder="Mahsulotlarni qidirish..." oninput="onSearchInput(this.value)" style="width:100%;padding:9px 12px 9px 36px;border-radius:12px;border:1px solid var(--border);background:var(--surface);font-size:14px;outline:none;">
+    </div>
+  </div>
+
+  <!-- CATEGORY TABS -->
+  <div id="category-tabs-wrap" style="padding:0 16px 12px;overflow-x:auto;display:flex;gap:8px;white-space:nowrap;-webkit-overflow-scrolling:touch;">
+    <!-- JS populates tabs -->
+  </div>
+
   <div class="products-grid" id="products-list">
     <div class="loader" style="grid-column:1/-1"><div class="spinner"></div> Yuklanmoqda...</div>
   </div>
@@ -362,6 +379,9 @@ let TOKEN = '%%API_TOKEN%%';
 let USER_TG_ID = tg.initDataUnsafe?.user?.id || null;
 
 let products = [];
+let categories = [];
+let selectedCategoryId = 'all';
+let searchQuery = '';
 let cart = {};
 let selectedDay  = 'today';
 let selectedTime = 'morning';
@@ -409,40 +429,82 @@ async function apiFetch(path, method='GET', body=null) {
 }
 
 // ============================================================
-// CATALOG — GRID
+// CATALOG — GRID & CATEGORIES
 // ============================================================
 async function loadProducts() {
-  const data = await apiFetch('/api/products');
-  // Splash minimun 1.2 sekund ko'rinsin, keyin mahsulotlar bilan birga yo'qolsin
+  const [prodData, catData] = await Promise.all([
+    apiFetch('/api/products'),
+    apiFetch('/api/categories')
+  ]);
   const minDelay = new Promise(r => setTimeout(r, 1200));
   await minDelay;
   hideSplash();
-  if (!data) { showToast('Xatolik yuz berdi'); return; }
-  products = Array.isArray(data) ? data.filter(p => p.is_active) : [];
+  if (!prodData) { showToast('Xatolik yuz berdi'); return; }
+  products = Array.isArray(prodData) ? prodData.filter(p => p.is_active) : [];
+  categories = Array.isArray(catData) ? catData : [];
+  renderCategoryTabs();
   renderProducts();
 }
 
-const EMOJIS = { 'Qatiq':'🥛','Qaymoq':'🧈','Tvorog':'🧀','Malako':'🍼' };
-function getEmoji(name) {
-  for (const [k,v] of Object.entries(EMOJIS)) if (name.toLowerCase().includes(k.toLowerCase())) return v;
-  return '🥛';
+function renderCategoryTabs() {
+  const wrap = document.getElementById('category-tabs-wrap');
+  if (!wrap) return;
+  if (!categories.length) {
+    wrap.style.display = 'none';
+    return;
+  }
+  wrap.style.display = 'flex';
+  let html = `<button type="button" class="cat-tab-btn ${selectedCategoryId==='all'?'active':''}" onclick="selectCategory('all')">Barchasi 🛍️</button>`;
+  categories.forEach(c => {
+    const isAct = String(selectedCategoryId) === String(c.id);
+    html += `<button type="button" class="cat-tab-btn ${isAct?'active':''}" onclick="selectCategory(${c.id})">${c.icon || '🛍️'} ${esc(c.name)}</button>`;
+  });
+  wrap.innerHTML = html;
+}
+
+function selectCategory(catId) {
+  selectedCategoryId = catId;
+  renderCategoryTabs();
+  renderProducts();
+}
+
+function onSearchInput(query) {
+  searchQuery = (query || '').toLowerCase().trim();
+  renderProducts();
+}
+
+const EMOJIS = { 'Mandarin':'🍊','Olma':'🍎','Banan':'🍌','Coca':'🥤','Pepsi':'🥤','Fanta':'🥤','Non':'🍞','Sut':'🧀','Pishloq':'🧀','Qatiq':'🥛','Shakar':'🍚','Choy':'🍵','Kofe':'☕' };
+function getEmoji(p) {
+  if (p.category_icon) return p.category_icon;
+  for (const [k,v] of Object.entries(EMOJIS)) if (p.name && p.name.toLowerCase().includes(k.toLowerCase())) return v;
+  return '🛍️';
 }
 
 function productImgHtml(p) {
   if (p.image_url) {
     return `<img class="product-img" src="${esc(p.image_url)}" alt="${esc(p.name)}"
-              onerror="this.parentElement.innerHTML='<div class=\\'product-img-placeholder\\'>${getEmoji(p.name)}</div>'">`;
+              onerror="this.parentElement.innerHTML='<div class=\\'product-img-placeholder\\'>${getEmoji(p)}</div>'">`;
   }
-  return `<div class="product-img-placeholder">${getEmoji(p.name)}</div>`;
+  return `<div class="product-img-placeholder">${getEmoji(p)}</div>`;
 }
 
 function renderProducts() {
   const list = document.getElementById('products-list');
-  if (!products.length) {
-    list.innerHTML = '<div class="loader" style="grid-column:1/-1">Mahsulotlar yo\'q</div>';
+  let filtered = products;
+
+  if (selectedCategoryId !== 'all') {
+    filtered = filtered.filter(p => String(p.category_id) === String(selectedCategoryId));
+  }
+
+  if (searchQuery) {
+    filtered = filtered.filter(p => p.name && p.name.toLowerCase().includes(searchQuery));
+  }
+
+  if (!filtered.length) {
+    list.innerHTML = '<div class="loader" style="grid-column:1/-1;text-align:center;padding:40px 10px;">Mahsulotlar topilmadi 🛍️</div>';
     return;
   }
-  list.innerHTML = products.map(p => {
+  list.innerHTML = filtered.map(p => {
     const qty = cart[p.id] || 0;
     return `
       <div class="product-card">

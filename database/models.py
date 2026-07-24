@@ -32,22 +32,34 @@ async def create_tables():
         );
     """)
     
+    # 2.5 categories table (Supermarket Categories)
+    await execute_query("""
+        CREATE TABLE IF NOT EXISTS categories (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(150) NOT NULL UNIQUE,
+            icon VARCHAR(50) DEFAULT '🛍️',
+            sort_order INT DEFAULT 0,
+            created_at TIMESTAMP DEFAULT NOW()
+        );
+    """)
+
     # 3. products table
-    # ✅ YaNGI: image_url maydoni qo'shildi
     await execute_query("""
         CREATE TABLE IF NOT EXISTS products (
             id SERIAL PRIMARY KEY,
             name VARCHAR(150) NOT NULL UNIQUE,
             price NUMERIC(12, 2) NOT NULL,
             image_url TEXT DEFAULT NULL,
+            category_id INT REFERENCES categories(id) ON DELETE SET NULL,
             is_active BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMP DEFAULT NOW()
         );
     """)
 
-    # ✅ Agar jadval avval yaratilgan bo'lsa, image_url ustunini qo'shish (migration)
+    # Migration for existing tables
     await execute_query("""
         ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT NULL;
+        ALTER TABLE products ADD COLUMN IF NOT EXISTS category_id INT REFERENCES categories(id) ON DELETE SET NULL;
     """)
     
     # 4. orders table
@@ -145,6 +157,24 @@ async def create_tables():
     """)
 
     logger.info("Tables checked/created successfully.")
+
+    # Insert default categories if empty
+    categories_count = await fetch_val("SELECT COUNT(*) FROM categories;")
+    if categories_count == 0:
+        default_cats = [
+            ("Mevalar va Sabzavotlar", "🥭", 1),
+            ("Ichimliklar va Sharbatlar", "🥤", 2),
+            ("Sut va Tuxum mahsulotlari", "🧀", 3),
+            ("Non va Shirinliklar", "🍞", 4),
+            ("Go'sht va Kolbasa", "🥩", 5),
+            ("Maishiy Kimyo va Ro'zg'or", "🧼", 6),
+        ]
+        for c_name, c_icon, c_order in default_cats:
+            await execute_query(
+                "INSERT INTO categories (name, icon, sort_order) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING;",
+                c_name, c_icon, c_order
+            )
+        logger.info("Default supermarket categories inserted.")
     
     # Insert default branch if empty
     branches_count = await fetch_val("SELECT COUNT(*) FROM branches;")
@@ -155,18 +185,20 @@ async def create_tables():
     # Insert default products if empty
     products_count = await fetch_val("SELECT COUNT(*) FROM products;")
     if products_count == 0:
+        cat_id = await fetch_val("SELECT id FROM categories ORDER BY sort_order ASC LIMIT 1;")
         default_products = [
-            ("Qatiq",  Decimal("7000.00")),
-            ("Qaymoq", Decimal("20000.00")),
-            ("Tvorog", Decimal("8500.00")),
-            ("Malako", Decimal("12000.00"))
+            ("Mandarin (1 kg)", Decimal("22000.00")),
+            ("Coca-Cola 1.5L", Decimal("14000.00")),
+            ("Shakar (1 kg)", Decimal("13000.00")),
+            ("Sariyog' 82.5% (200g)", Decimal("28000.00")),
+            ("Yopgan non", Decimal("4000.00"))
         ]
-        for name, price in default_products:
+        for p_name, p_price in default_products:
             await execute_query(
-                "INSERT INTO products (name, price) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING;",
-                name, price
+                "INSERT INTO products (name, price, category_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING;",
+                p_name, p_price, cat_id
             )
-        logger.info("Default products inserted.")
+        logger.info("Default supermarket products inserted.")
 
 # --- USER METHODS ---
 
@@ -209,14 +241,47 @@ async def get_all_users() -> List[Dict[str, Any]]:
 async def update_user_admin_status(telegram_id: int, is_admin: bool):
     await execute_query("UPDATE users SET is_admin = $1 WHERE telegram_id = $2;", is_admin, telegram_id)
 
+# --- CATEGORY METHODS ---
+
+async def get_all_categories() -> List[Dict[str, Any]]:
+    rows = await fetch_rows("SELECT * FROM categories ORDER BY sort_order ASC, name ASC;")
+    return [dict(r) for r in rows]
+
+async def create_category(name: str, icon: str = '🛍️', sort_order: int = 0) -> int:
+    row = await fetch_row(
+        "INSERT INTO categories (name, icon, sort_order) VALUES ($1, $2, $3) RETURNING id;",
+        name, icon or '🛍️', sort_order
+    )
+    return row['id']
+
+async def update_category(category_id: int, name: str, icon: str = '🛍️', sort_order: int = 0):
+    await execute_query(
+        "UPDATE categories SET name = $1, icon = $2, sort_order = $3 WHERE id = $4;",
+        name, icon or '🛍️', sort_order, category_id
+    )
+
+async def delete_category(category_id: int):
+    await execute_query("DELETE FROM categories WHERE id = $1;", category_id)
+
 # --- PRODUCT METHODS ---
 
 async def get_active_products() -> List[Dict[str, Any]]:
-    rows = await fetch_rows("SELECT * FROM products WHERE is_active = TRUE ORDER BY name ASC;")
+    rows = await fetch_rows("""
+        SELECT p.*, c.name as category_name, c.icon as category_icon 
+        FROM products p 
+        LEFT JOIN categories c ON p.category_id = c.id 
+        WHERE p.is_active = TRUE 
+        ORDER BY c.sort_order ASC, p.name ASC;
+    """)
     return [dict(r) for r in rows]
 
 async def get_all_products() -> List[Dict[str, Any]]:
-    rows = await fetch_rows("SELECT * FROM products ORDER BY name ASC;")
+    rows = await fetch_rows("""
+        SELECT p.*, c.name as category_name, c.icon as category_icon 
+        FROM products p 
+        LEFT JOIN categories c ON p.category_id = c.id 
+        ORDER BY p.name ASC;
+    """)
     return [dict(r) for r in rows]
 
 async def get_product_by_id(product_id: int) -> Optional[Dict[str, Any]]:
@@ -226,30 +291,25 @@ async def get_product_by_id(product_id: int) -> Optional[Dict[str, Any]]:
 async def update_product_price(product_id: int, new_price: Decimal):
     await execute_query("UPDATE products SET price = $1 WHERE id = $2;", new_price, product_id)
 
-async def add_product(name: str, price: Decimal, image_url: str = None) -> Dict[str, Any]:
-    """✅ YaNGI: image_url parametri qo'shildi"""
+async def add_product(name: str, price: Decimal, image_url: str = None, category_id: int = None) -> Dict[str, Any]:
     row = await fetch_row(
-        "INSERT INTO products (name, price, image_url) VALUES ($1, $2, $3) RETURNING *;",
-        name, price, image_url
+        "INSERT INTO products (name, price, image_url, category_id) VALUES ($1, $2, $3, $4) RETURNING *;",
+        name, price, image_url, category_id
     )
     return dict(row)
 
 async def set_product_active_status(product_id: int, is_active: bool):
     await execute_query("UPDATE products SET is_active = $1 WHERE id = $2;", is_active, product_id)
 
-# ✅ YaNGI: Mahsulot rasmini yangilash
 async def update_product_image(product_id: int, image_url: str) -> Optional[Dict[str, Any]]:
-    """Admin tomonidan mahsulot rasmini yangilash."""
     row = await fetch_row(
         "UPDATE products SET image_url = $1 WHERE id = $2 RETURNING *;",
         image_url, product_id
     )
     return dict(row) if row else None
 
-# ✅ YaNGI: Mahsulotni to'liq yangilash (nom, narx, rasm)
 async def update_product(product_id: int, name: str = None, price: Decimal = None,
-                         image_url: str = None) -> Optional[Dict[str, Any]]:
-    """Admin tomonidan mahsulot ma'lumotlarini yangilash."""
+                         image_url: str = None, category_id: int = None) -> Optional[Dict[str, Any]]:
     fields = []
     values = []
     idx = 1
@@ -259,13 +319,15 @@ async def update_product(product_id: int, name: str = None, price: Decimal = Non
         fields.append(f"price = ${idx}"); values.append(price); idx += 1
     if image_url is not None:
         fields.append(f"image_url = ${idx}"); values.append(image_url); idx += 1
+    if category_id is not None:
+        fields.append(f"category_id = ${idx}"); values.append(category_id); idx += 1
+    
     if not fields:
         return await get_product_by_id(product_id)
+        
     values.append(product_id)
-    row = await fetch_row(
-        f"UPDATE products SET {', '.join(fields)} WHERE id = ${idx} RETURNING *;",
-        *values
-    )
+    query = f"UPDATE products SET {', '.join(fields)} WHERE id = ${idx} RETURNING *;"
+    row = await fetch_row(query, *values)
     return dict(row) if row else None
 
 # --- ORDER METHODS ---

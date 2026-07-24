@@ -39,7 +39,7 @@ async def cmd_start(message: Message, state: FSMContext):
         logger.info(f"User {telegram_id} ({user['full_name']}) started the bot. Already registered.")
         # Send main menu reply keyboard first so the customer has it permanently
         await message.answer(
-            "Sut mahsulotlarini yetkazib berish xizmatiga xush kelibsiz. 🌅🥛",
+            "🍊 Mandarin Supermarket yetkazib berish xizmatiga xush kelibsiz! 🛒🛍️",
             reply_markup=keyboards.get_main_menu_keyboard(is_admin=is_admin)
         )
         
@@ -53,14 +53,14 @@ async def cmd_start(message: Message, state: FSMContext):
         # Then send greeting message with the inline button
         await message.answer(
             f"Assalomu alaykum, {user['full_name']}!\n"
-            "Buyurtma berish uchun pastdagi tugmani bosing yoki menyudan foydalaning:",
+            "Buyurtma berish uchun pastdagi '🛒 Buyurtma berish' tugmasini bosing:",
             reply_markup=inline_keyboard
         )
         return
 
     logger.info(f"New user {telegram_id} started the bot. Initiating registration.")
     await message.answer(
-        "Assalomu alaykum! Sut mahsulotlarini buyurtma qilish va yetkazib berish botiga xush kelibsiz.\n\n"
+        "Assalomu alaykum! 🍊 **Mandarin Supermarket** onlayn do'koni va yetkazib berish botiga xush kelibsiz.\n\n"
         "Xizmatdan foydalanish uchun ro'yxatdan o'tishingiz lozim.\n\n"
         "Iltimos, **ism va familiyangizni** kiriting (masalan: Alisher Usmonov):",
         parse_mode="Markdown",
