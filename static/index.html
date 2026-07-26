@@ -356,7 +356,7 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
       <button class="nav-item" onclick="navigate('map',this)"><span class="icon">🗺️</span> Yetkazish xaritasi</button>
       <button class="nav-item" onclick="navigate('miniapp',this)"><span class="icon">📱</span> Mini App</button>
       <button class="nav-item" onclick="navigate('settings',this)"><span class="icon">⚙️</span> Eslatma sozlamalari</button>
-      <button class="nav-item" onclick="navigate('logistics',this)"><span class="icon">🚚</span> Kuryer & MFY</button>
+      <button class="nav-item" onclick="navigate('logistics',this)"><span class="icon">🚚</span> Kuryerlar</button>
       <button class="nav-item" onclick="navigate('reminders',this)"><span class="icon">⏰</span> Eslatmalar</button>
     </nav>
     <div class="sidebar-footer">
@@ -679,51 +679,26 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
 
       <!-- LOGISTICS PAGE -->
       <div class="page" id="page-logistics">
-        <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:20px;">
-          <!-- Couriers Box -->
-          <div class="card" style="flex:1.2;min-width:300px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
-              <h3 style="font-size:16px;">🚚 Kuryerlar ro'yxati</h3>
-              <button type="button" class="action-btn primary" onclick="openAddCourierModal()">➕ Yangi kuryer</button>
-            </div>
-            <div style="overflow-x:auto;">
-              <table class="table" style="width:100%;border-collapse:collapse;text-align:left;">
-                <thead>
-                  <tr style="border-bottom:1px solid var(--border);color:var(--muted);font-size:12px;">
-                    <th style="padding:10px 5px;">Ism</th>
-                    <th style="padding:10px 5px;">Telefon</th>
-                    <th style="padding:10px 5px;">Telegram ID</th>
-                    <th style="padding:10px 5px;">Status</th>
-                    <th style="padding:10px 5px;text-align:right;">Amallar</th>
-                  </tr>
-                </thead>
-                <tbody id="couriers-table-body">
-                  <!-- JS dynamically populates -->
-                </tbody>
-              </table>
-            </div>
+        <div class="card" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+            <h3 style="font-size:16px;">🚚 Kuryerlar ro'yxati</h3>
+            <button type="button" class="action-btn primary" onclick="openAddCourierModal()">➕ Yangi kuryer</button>
           </div>
-
-          <!-- MFY Box -->
-          <div class="card" style="flex:1;min-width:300px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
-              <h3 style="font-size:16px;">📍 Mahallalar (MFY)</h3>
-              <button type="button" class="action-btn primary" onclick="openAddMfyModal()">➕ Yangi mahalla</button>
-            </div>
-            <div style="overflow-x:auto;">
-              <table class="table" style="width:100%;border-collapse:collapse;text-align:left;">
-                <thead>
-                  <tr style="border-bottom:1px solid var(--border);color:var(--muted);font-size:12px;">
-                    <th style="padding:10px 5px;">Mahalla</th>
-                    <th style="padding:10px 5px;">Kuryer</th>
-                    <th style="padding:10px 5px;text-align:right;">Amallar</th>
-                  </tr>
-                </thead>
-                <tbody id="mfy-table-body">
-                  <!-- JS dynamically populates -->
-                </tbody>
-              </table>
-            </div>
+          <div style="overflow-x:auto;">
+            <table class="table" style="width:100%;border-collapse:collapse;text-align:left;">
+              <thead>
+                <tr style="border-bottom:1px solid var(--border);color:var(--muted);font-size:12px;">
+                  <th style="padding:10px 5px;">Ism</th>
+                  <th style="padding:10px 5px;">Telefon</th>
+                  <th style="padding:10px 5px;">Telegram ID</th>
+                  <th style="padding:10px 5px;">Status</th>
+                  <th style="padding:10px 5px;text-align:right;">Amallar</th>
+                </tr>
+              </thead>
+              <tbody id="couriers-table-body">
+                <!-- JS dynamically populates -->
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -878,28 +853,6 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
   </div>
 </div>
 
-<!-- MFY MODAL -->
-<div class="modal-overlay" id="mfy-modal">
-  <div class="modal">
-    <button class="modal-close" onclick="closeModal('mfy-modal')">×</button>
-    <div class="modal-title" id="mfy-modal-title">Yangi mahalla</div>
-    <input type="hidden" id="mfy-id-input">
-    <div class="form-group">
-      <label class="form-label">Mahalla nomi (MFY)</label>
-      <input type="text" class="form-input" id="mfy-name-input" placeholder="Masalan: Mustaqillik">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Mas'ul Kuryer</label>
-      <select class="form-input" id="mfy-courier-select">
-        <!-- JS dynamically populates -->
-      </select>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeModal('mfy-modal')">Bekor</button>
-      <button class="btn-save" onclick="saveMfy()">Saqlash</button>
-    </div>
-  </div>
-</div>
 
 <!-- REMINDER MODAL -->
 <div class="modal-overlay" id="reminder-modal">
@@ -1044,7 +997,7 @@ function navigate(page, btn) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   if (btn) btn.classList.add('active');
   document.getElementById('page-' + page).classList.add('active');
-  const titles = { dashboard:'Statistika', orders:'Buyurtmalar', categories:'🗂️ Kategoriyalar boshqaruvi', products:'Mahsulotlar', customers:'Mijozlar', broadcast:'Xabar yuborish', payments:'To\'lovlar', map:'🗺️ Yetkazish xaritasi', miniapp:'📱 Mini App', settings:'⏰ Eslatma sozlamalari' };
+  const titles = { dashboard:'Statistika', orders:'Buyurtmalar', categories:'🗂️ Kategoriyalar boshqaruvi', products:'Mahsulotlar', customers:'Mijozlar', broadcast:'Xabar yuborish', payments:'To\'lovlar', map:'🗺️ Yetkazish xaritasi', miniapp:'📱 Mini App', settings:'⏰ Eslatma sozlamalari', logistics:'🚚 Kuryerlar boshqaruvi' };
   document.getElementById('page-title').textContent = titles[page] || page;
   if (page === 'orders') loadOrders();
   if (page === 'categories') loadCategoriesPage();
@@ -1055,6 +1008,7 @@ function navigate(page, btn) {
   if (page === 'map') { initMap(); setTimeout(() => { if(mapInstance) mapInstance.invalidateSize(); }, 300); }
   if (page === 'miniapp') loadMiniappEditor();
   if (page === 'settings') loadSettingsPage();
+  if (page === 'logistics') loadCouriers();
 }
 
 // ==================== DASHBOARD ====================
@@ -2228,13 +2182,11 @@ function drawStraightRoute(start, orders) {
   document.getElementById('route-status').textContent = '\u26a0\ufe0f API kalit yo\u2019q \u2014 to\u2019g\u2019ri chiziq ko\u2019rsatilmoqda';
 }
 
-// ==================== LOGISTICS (COURIERS & MFY) ====================
+// ==================== LOGISTICS (COURIERS) ====================
 let allCouriersList = [];
-let allMfyList = [];
 
 async function loadLogisticsPage() {
   await loadCouriers();
-  await loadMfy();
 }
 
 async function loadCouriersListGlobally() {
@@ -2333,7 +2285,6 @@ async function saveCourier() {
     showToast('Kuryer muvaffaqiyatli saqlandi!', 'success');
     closeModal('courier-modal');
     loadCouriers();
-    loadMfy();
   }
 }
 
@@ -2343,107 +2294,6 @@ async function deleteCourier(id) {
   if (res && res.success) {
     showToast('Kuryer o\'chirildi!', 'success');
     loadCouriers();
-    loadMfy();
-  }
-}
-
-async function loadMfy() {
-  const data = await api('/api/mfy');
-  if (data && Array.isArray(data)) {
-    allMfyList = data;
-    renderMfy();
-  } else if (data && data.error) {
-    showToast(data.error, 'error');
-  }
-}
-
-function renderMfy() {
-  const tbody = document.getElementById('mfy-table-body');
-  if (!tbody) return;
-  tbody.innerHTML = allMfyList.length
-    ? allMfyList.map(m => `
-      <tr style="border-bottom: 1px solid var(--border);">
-        <td style="padding:10px 5px;"><b>${esc(m.name)} MFY</b></td>
-        <td style="padding:10px 5px;">${esc(m.courier_name || 'Biriktirilmagan')}</td>
-        <td style="padding:10px 5px;text-align:right;">
-          <div class="btn-row" style="display:inline-flex;gap:4px;">
-            <button class="action-btn" onclick="openEditMfyModal(${m.id}, '${esc(m.name)}', ${m.courier_id || 'null'})">✏️</button>
-            <button class="action-btn" style="background:rgba(239,68,68,0.1);color:var(--red);" onclick="deleteMfy(${m.id})">🗑️</button>
-          </div>
-        </td>
-      </tr>
-    `).join('')
-    : '<tr><td colspan="3"><div class="empty-state"><p>Mahallalar topilmadi</p></div></td></tr>';
-}
-
-function openAddMfyModal() {
-  document.getElementById('mfy-modal-title').textContent = 'Yangi mahalla (MFY)';
-  document.getElementById('mfy-id-input').value = '';
-  document.getElementById('mfy-name-input').value = '';
-  
-  const select = document.getElementById('mfy-courier-select');
-  select.innerHTML = '<option value="">Biriktirilmagan</option>';
-  if (Array.isArray(allCouriersList)) {
-    allCouriersList.forEach(c => {
-      select.innerHTML += `<option value="${c.id}">${esc(c.name)} (${esc(c.phone_number)})</option>`;
-    });
-  }
-  
-  openModal('mfy-modal');
-}
-
-function openEditMfyModal(id, name, courierId) {
-  document.getElementById('mfy-modal-title').textContent = 'Mahallani tahrirlash';
-  document.getElementById('mfy-id-input').value = id;
-  document.getElementById('mfy-name-input').value = name;
-  
-  const select = document.getElementById('mfy-courier-select');
-  select.innerHTML = '<option value="">Biriktirilmagan</option>';
-  if (Array.isArray(allCouriersList)) {
-    allCouriersList.forEach(c => {
-      const selected = c.id === courierId ? 'selected' : '';
-      select.innerHTML += `<option value="${c.id}" ${selected}>${esc(c.name)} (${esc(c.phone_number)})</option>`;
-    });
-  }
-  
-  openModal('mfy-modal');
-}
-
-async function saveMfy() {
-  const id = document.getElementById('mfy-id-input').value;
-  const name = document.getElementById('mfy-name-input').value.trim();
-  const courierIdVal = document.getElementById('mfy-courier-select').value;
-  
-  if (!name) {
-    showToast('Mahalla nomi bo\'sh bo\'lmasligi kerak!', 'error');
-    return;
-  }
-  
-  const payload = {
-    name: name,
-    courier_id: courierIdVal ? parseInt(courierIdVal) : null
-  };
-  
-  let res;
-  if (id) {
-    res = await api(`/api/mfy/${id}`, 'PUT', payload);
-  } else {
-    res = await api('/api/mfy', 'POST', payload);
-  }
-  
-  if (res && res.success) {
-    showToast('Mahalla muvaffaqiyatli saqlandi!', 'success');
-    closeModal('mfy-modal');
-    loadMfy();
-  }
-}
-
-async function deleteMfy(id) {
-  if (!confirm('Haqiqatan ham bu mahallani o\'chirib tashlamoqchimisiz?')) return;
-  const res = await api(`/api/mfy/${id}`, 'DELETE');
-  if (res && res.success) {
-    showToast('Mahalla o\'chirildi!', 'success');
-    loadMfy();
   }
 }
 

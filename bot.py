@@ -338,7 +338,44 @@ async def api_get_customers(request):
         logger.error(f"api_get_customers: {e}")
         return web.json_response({"error": str(e)}, status=500)
 
-# --- FILE UPLOAD (rasm/video) ---
+# --- FILE UPLOAD (rasm/video - Permanent Cloud Storage) ---
+
+async def upload_image_to_cloud(file_bytes: bytes, filename: str) -> str:
+    """Rasmlarni doimiy saqlash uchun bulutli Cloud CDN xostingiga yuklaydi (Git push bo'lganda ham o'chib ketmasligi uchun)"""
+    import base64
+    import aiohttp
+    
+    # 1-Urinish: FreeImage.host API
+    try:
+        encoded = base64.b64encode(file_bytes).decode('utf-8')
+        payload = {'key': '6d207e02198a847aa98d0a2a901485a5', 'action': 'upload', 'source': encoded}
+        async with aiohttp.ClientSession() as session:
+            async with session.post('https://freeimage.host/api/1/upload', data=payload, timeout=12) as resp:
+                if resp.status == 200:
+                    res_json = await resp.json()
+                    cdn_url = res_json.get('image', {}).get('url')
+                    if cdn_url:
+                        logger.info(f"Rasm FreeImage.host CDN ga muvaffaqiyatli yuklandi: {cdn_url}")
+                        return cdn_url
+    except Exception as err1:
+        logger.warning(f"FreeImage upload warning: {err1}")
+
+    # 2-Urinish: Catbox.moe API (Zaxira)
+    try:
+        data = aiohttp.FormData()
+        data.add_field('reqtype', 'fileupload')
+        data.add_field('fileToUpload', file_bytes, filename=filename or 'product.jpg', content_type='image/jpeg')
+        async with aiohttp.ClientSession() as session:
+            async with session.post('https://catbox.moe/user/api.php', data=data, timeout=12) as resp:
+                if resp.status == 200:
+                    cdn_url = (await resp.text()).strip()
+                    if cdn_url.startswith("http"):
+                        logger.info(f"Rasm Catbox.moe CDN ga muvaffaqiyatli yuklandi: {cdn_url}")
+                        return cdn_url
+    except Exception as err2:
+        logger.warning(f"Catbox upload warning: {err2}")
+
+    return None
 
 async def api_upload_file(request):
     if not is_authorized(request):
@@ -356,31 +393,40 @@ async def api_upload_file(request):
         if ext not in allowed_ext:
             return web.json_response({"error": "Fayl turi qo'llab-quvvatlanmaydi!"}, status=400)
 
-        uploads_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
-        os.makedirs(uploads_dir, exist_ok=True)
-
-        unique_name = f"{uuid.uuid4().hex}{ext}"
-        filepath = os.path.join(uploads_dir, unique_name)
-
+        file_bytes = bytearray()
         size = 0
         max_size = 20 * 1024 * 1024  # 20 MB
-        with open(filepath, 'wb') as f:
-            while True:
-                chunk = await field.read_chunk(1024 * 64)
-                if not chunk:
-                    break
-                size += len(chunk)
-                if size > max_size:
-                    f.close()
-                    os.remove(filepath)
-                    return web.json_response({"error": "Fayl hajmi 20MB dan oshmasligi kerak!"}, status=400)
-                f.write(chunk)
+        
+        while True:
+            chunk = await field.read_chunk(1024 * 64)
+            if not chunk:
+                break
+            size += len(chunk)
+            if size > max_size:
+                return web.json_response({"error": "Fayl hajmi 20MB dan oshmasligi kerak!"}, status=400)
+            file_bytes.extend(chunk)
 
-        base_url = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
-        file_url = f"{base_url}/static/uploads/{unique_name}"
+        file_url = None
         media_type = 'video' if ext in ['.mp4', '.mov', '.avi'] else 'photo'
 
-        logger.info(f"File uploaded: {unique_name} ({size} bytes)")
+        # Agar rasm bo'lsa, avval Bulutli Cloud storage ga yuklaymiz (Git push-da yo'qolmasligi uchun)
+        if media_type == 'photo':
+            cloud_url = await upload_image_to_cloud(bytes(file_bytes), filename)
+            if cloud_url:
+                file_url = cloud_url
+
+        # Agar bulutga yuklanmay qolsa yoki video bo'lsa, mahalliy xotiraga saqlaymiz (zaxira)
+        if not file_url:
+            uploads_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
+            os.makedirs(uploads_dir, exist_ok=True)
+            unique_name = f"{uuid.uuid4().hex}{ext}"
+            filepath = os.path.join(uploads_dir, unique_name)
+            with open(filepath, 'wb') as f:
+                f.write(file_bytes)
+            base_url = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
+            file_url = f"{base_url}/static/uploads/{unique_name}"
+
+        logger.info(f"File uploaded successfully: {file_url} ({size} bytes)")
         return web.json_response({"success": True, "url": file_url, "media_type": media_type})
     except Exception as e:
         logger.error(f"api_upload_file: {e}")

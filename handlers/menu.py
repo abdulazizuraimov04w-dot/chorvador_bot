@@ -23,7 +23,7 @@ async def cmd_open_miniapp(message: Message):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="🛒 Buyurtma berish", web_app=WebAppInfo(url=MINIAPP_URL))
     ]])
-    await message.answer("🥛 *Sut mahsulotlari katalogi*\n\nQuyidagi tugmani bosib buyurtma bering:",
+    await message.answer("🍊 *Mandarin Supermarket Katalogi*\n\nBuyurtma berish uchun quyidagi '🛒 Buyurtma berish' tugmasini bosing:",
         reply_markup=keyboard, parse_mode="Markdown")
 
 @router.message(F.text == "👤 Profilim")

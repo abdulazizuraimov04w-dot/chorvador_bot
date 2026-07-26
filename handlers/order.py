@@ -33,7 +33,7 @@ async def start_order(message: Message, state: FSMContext):
     
     keyboard = keyboards.get_products_keyboard(products)
     await message.answer(
-        "🧀 **Sotuvdagi sut mahsulotlarimiz:**\n\n"
+        "🍊 **Mandarin Supermarket mahsulotlari:**\n\n"
         "Sotib olmoqchi bo'lgan mahsulotni tanlang:",
         reply_markup=keyboard,
         parse_mode="Markdown"
@@ -49,7 +49,7 @@ async def back_to_products(callback: CallbackQuery, state: FSMContext):
         
     keyboard = keyboards.get_products_keyboard(products)
     await callback.message.edit_text(
-        "🧀 **Sotuvdagi sut mahsulotlarimiz:**\n\n"
+        "🍊 **Mandarin Supermarket mahsulotlari:**\n\n"
         "Sotib olmoqchi bo'lgan mahsulotni tanlang:",
         reply_markup=keyboard,
         parse_mode="Markdown"
@@ -180,7 +180,7 @@ async def add_more_products(callback: CallbackQuery, state: FSMContext):
         
     keyboard = keyboards.get_products_keyboard(products)
     await callback.message.edit_text(
-        "🧀 **Sotuvdagi sut mahsulotlarimiz:**\n\n"
+        "🍊 **Mandarin Supermarket mahsulotlari:**\n\n"
         "Sotib olmoqchi bo'lgan qo'shimcha mahsulotni tanlang:",
         reply_markup=keyboard,
         parse_mode="Markdown"

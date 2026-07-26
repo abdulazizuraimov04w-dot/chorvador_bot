@@ -28,7 +28,7 @@ async def send_breakfast_reminder_to_customers(bot: Bot):
     # Bazadan matn va rasmni olish
     text = await models.get_setting(
         'reminder_text',
-        "☀️ Xayrli tong!\n\nBugun nonushtaga sut mahsulotlari buyurtma qiling 🥛"
+        "🍊 Xayrli tong!\n\nMandarin Supermarketdan yangi va sarxil mahsulotlarni buyurtma qiling! 🛒"
     )
     photo_url = await models.get_setting('reminder_photo', '')
 
