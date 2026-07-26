@@ -104,6 +104,8 @@ async def create_tables():
         'reminder_photo':  '',
         'report_hour':     '6',
         'report_minute':   '0',
+        'min_order_amount':'70000',
+        'loyalty_target':   '10',
     }
     for k, v in default_settings.items():
         await execute_query(
@@ -280,6 +282,9 @@ async def get_customers_analytics() -> List[Dict[str, Any]]:
                 LIMIT 1
             )                                                  AS favorite_product,
 
+            -- 70k+ so'mlik mos buyurtmalar soni (loyalty)
+            COUNT(o.id) FILTER (WHERE o.total_price >= 70000)   AS qualifying_orders,
+
             -- Mijoz segmenti
             CASE
                 WHEN COUNT(o.id) = 0 THEN 'new'
@@ -291,7 +296,7 @@ async def get_customers_analytics() -> List[Dict[str, Any]]:
         FROM users u
         LEFT JOIN orders o
             ON o.user_id = u.id
-            AND o.status IN ('confirmed','completed')
+            AND o.status IN ('confirmed','completed','pending')
         GROUP BY u.id
         ORDER BY total_spent DESC, u.created_at DESC;
     """)
@@ -308,6 +313,10 @@ async def get_customers_analytics() -> List[Dict[str, Any]]:
         d['avg_order_value'] = float(d['avg_order_value'])
         d['total_orders']    = int(d['total_orders'])
         d['days_since_last_order'] = int(d['days_since_last_order'])
+        q_orders = int(d.get('qualifying_orders') or 0)
+        d['qualifying_orders'] = q_orders
+        d['loyalty_step']      = q_orders % 10 if q_orders % 10 != 0 else (10 if q_orders > 0 else 0)
+        d['gifts_earned']      = q_orders // 10
         result.append(d)
     return result
 
@@ -392,6 +401,89 @@ async def get_customer_detail(user_id: int) -> Optional[Dict[str, Any]]:
 
     user['orders'] = orders
     return user
+
+async def get_min_order_amount() -> float:
+    """Minimal buyurtma summasini settings dan olish (default 70,000 so'm)."""
+    val = await fetch_val("SELECT value FROM settings WHERE key = 'min_order_amount';")
+    try:
+        return float(val) if val else 70000.0
+    except (ValueError, TypeError):
+        return 70000.0
+
+async def get_loyalty_target() -> int:
+    """Sovg'a marrasi (default 10 buyurtma)."""
+    val = await fetch_val("SELECT value FROM settings WHERE key = 'loyalty_target';")
+    try:
+        return int(val) if val else 10
+    except (ValueError, TypeError):
+        return 10
+
+async def get_user_loyalty_info(telegram_id_or_user_id: int) -> Dict[str, Any]:
+    """Mijozning 70k+ so'mlik buyurtmalari bo'yicha loyalty progress va visual bar matnini hisoblash."""
+    min_amount = await get_min_order_amount()
+    target     = await get_loyalty_target()
+
+    # User_id yoki telegram_id orqali user topamiz
+    user = await fetch_row("""
+        SELECT id, telegram_id, full_name FROM users 
+        WHERE id = $1 OR telegram_id = $1 LIMIT 1;
+    """, telegram_id_or_user_id)
+
+    if not user:
+        return {
+            "qualifying_orders": 0,
+            "target": target,
+            "current_step": 0,
+            "remaining": target,
+            "gifts_earned": 0,
+            "is_gift_order": False,
+            "min_amount": min_amount,
+            "progress_bar": "⬜" * target,
+            "text": f"🎁 Sovg'aga {target} ta buyurtma qoldi!\n[ {'⬜'*target} ] 0/{target}"
+        }
+
+    u_id = user['id']
+    # Minimal summa va bajarilgan statusga ega buyurtmalar soni
+    q_count = await fetch_val("""
+        SELECT COUNT(id) FROM orders 
+        WHERE user_id = $1 
+          AND status IN ('confirmed', 'completed', 'pending')
+          AND total_price >= $2;
+    """, u_id, min_amount) or 0
+
+    current_step = q_count % target
+    remaining    = target - current_step if current_step != 0 else target
+    gifts_earned = q_count // target
+
+    # Agar q_count > 0 va q_count % target == 0 bo'lsa, demak oxirgi buyurtma yubiley sovg'ali bo'lgan
+    is_gift_order = (q_count > 0 and current_step == 0)
+
+    # Visual Emoji Progress Bar generator (masalan: 🟩🟩🟩🟩🟩🟩🟩⬜⬜⬜)
+    filled_blocks = current_step if current_step > 0 else (target if is_gift_order else 0)
+    empty_blocks  = target - filled_blocks
+
+    # Progress bar belgilari: to'lgani 🟩, to'lmagani ⬜
+    bar_str = "🟩" * filled_blocks + "⬜" * empty_blocks
+
+    if is_gift_order:
+        text = f"🎉 **TABRIKLAYMIZ!** Siz {target}-yubiley buyurtmangizdasiz!\n[ {bar_str} ] {target}/{target}\n🎁 **Sizga MAXSUS SOVG'A biriktirildi!**"
+    elif remaining == 1:
+        text = f"🔥 **JUDA YA QINS IZ!** Yana 1 ta buyurtma bersangiz SOVG'A olasiz!\n[ {bar_str} ] {current_step}/{target}"
+    else:
+        text = f"🎁 **Sovg'angizga {remaining} ta buyurtma qoldi!**\n[ {bar_str} ] {current_step}/{target}"
+
+    return {
+        "user_id": u_id,
+        "qualifying_orders": q_count,
+        "target": target,
+        "current_step": current_step if not is_gift_order else target,
+        "remaining": 0 if is_gift_order else remaining,
+        "gifts_earned": gifts_earned,
+        "is_gift_order": is_gift_order,
+        "min_amount": min_amount,
+        "progress_bar": bar_str,
+        "text": text
+    }
 
 # --- CATEGORY METHODS ---
 

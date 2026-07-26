@@ -220,6 +220,16 @@ async def confirm_order(callback: CallbackQuery, state: FSMContext):
             'quantity': item['quantity'],
             'price': Decimal(str(item['price']))
         })
+
+    # Minimal buyurtma summasini tekshirish (70 000 so'm)
+    min_amount = await models.get_min_order_amount()
+    if float(total_price) < min_amount:
+        await callback.answer(
+            f"⚠️ Minimal buyurtma summasi — {int(min_amount):,} so'm!\n"
+            f"Hozirgi savat: {int(total_price):,} so'm. Yana {int(min_amount - float(total_price)):,} so'mlik mahsulot qo'shing.".replace(",", " "),
+            show_alert=True
+        )
+        return
         
     try:
         # Save to DB
@@ -230,7 +240,13 @@ async def confirm_order(callback: CallbackQuery, state: FSMContext):
         )
         
         logger.info(f"Order #{order_id} successfully created for user {telegram_id}. Total: {total_price}")
-        
+
+        # Get updated user loyalty info
+        loyalty = await models.get_user_loyalty_info(telegram_id)
+        gift_banner = ""
+        if loyalty.get("is_gift_order"):
+            gift_banner = "\n\n🎁 **SOVG'ALI BUYURTMA!** Ushbu buyurtmangiz uchun sizga MAXSUS SOVG'A biriktirildi!"
+
         # Get the assigned courier for this order
         courier_tg_id = None
         courier_name = None
@@ -251,12 +267,15 @@ async def confirm_order(callback: CallbackQuery, state: FSMContext):
         except Exception as err:
             logger.error(f"Failed to fetch courier for order notification: {err}")
 
-        # Success message
+        # Success message with visual loyalty progress bar
+        loyalty_msg = f"\n\n{loyalty.get('text', '')}"
         await callback.message.edit_text(
-            f"✅ Buyurtmangiz qabul qilindi.\n\n"
-            f"Yetkazib berish vaqti:\n"
-            f"⏰ 06:30 - 07:30\n\n"
-            f"Buyurtma raqami: #{order_id}"
+            f"✅ **Buyurtmangiz qabul qilindi!**\n\n"
+            f"⏰ **Yetkazib berish vaqti:** 06:30 - 07:30\n"
+            f"📦 **Buyurtma raqami:** #{order_id}"
+            f"{gift_banner}"
+            f"{loyalty_msg}",
+            parse_mode="Markdown"
         )
         
         # Clear FSM
@@ -267,7 +286,7 @@ async def confirm_order(callback: CallbackQuery, state: FSMContext):
         is_admin = user.get("is_admin", False) if user else False
         
         await callback.message.answer(
-            "Xizmatimizdan foydalanganingiz uchun rahmat!",
+            "Xizmatimizdan foydalanganingiz uchun rahmat! 🍊",
             reply_markup=keyboards.get_main_menu_keyboard(is_admin=is_admin)
         )
         
@@ -298,8 +317,10 @@ async def confirm_order(callback: CallbackQuery, state: FSMContext):
         courier_info = f"**Kuryer:** {courier_name}\n" if courier_name else ""
         mfy_info = f"**Mahalla (MFY):** {mfy_name} MFY\n" if mfy_name else ""
 
+        gift_tag = "\n🎁 **[SOVG'ALI BUYURTMA - 10-YUBILEY!]**" if loyalty.get("is_gift_order") else ""
+
         admin_text = (
-            f"🔔 **YANGI BUYURTMA KELIB TUSHDI!**\n\n"
+            f"🔔 **YANGI BUYURTMA KELIB TUSHDI!**{gift_tag}\n\n"
             f"**Buyurtma raqami:** #{order_id}\n"
             f"**Mijoz:** {user['full_name']}\n"
             f"**Telefon:** {user['phone_number']}\n"
@@ -326,7 +347,7 @@ async def confirm_order(callback: CallbackQuery, state: FSMContext):
                     loc_link = f"\n📍 [Mijoz joylashuvi (Lokatsiya)](https://maps.google.com/?q={user['latitude']},{user['longitude']})"
                 
                 courier_text = (
-                    f"🚚 **YANGI BUYURTMA (Kuryer uchun)**\n\n"
+                    f"🚚 **YANGI BUYURTMA (Kuryer uchun)**{gift_tag}\n\n"
                     f"**Hudud (MFY):** {mfy_name} MFY\n"
                     f"**Buyurtma:** #{order_id}\n"
                     f"**Mijoz:** {user['full_name']}\n"

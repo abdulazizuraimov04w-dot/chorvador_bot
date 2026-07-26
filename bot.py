@@ -351,6 +351,57 @@ async def api_get_customer_detail(request):
         logger.error(f"api_get_customer_detail: {e}")
         return web.json_response({"error": str(e)}, status=500)
 
+async def api_get_user_loyalty(request):
+    """Mijozning loyalty progressini va minimal summani qaytarish (Public endpoint for Mini App)."""
+    try:
+        from database import models
+        tg_id = request.query.get('telegram_id')
+        user_id = int(tg_id) if (tg_id and tg_id.isdigit()) else 0
+        loyalty = await models.get_user_loyalty_info(user_id)
+        return web.json_response(loyalty)
+    except Exception as e:
+        logger.error(f"api_get_user_loyalty: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+async def api_get_loyalty_settings(request):
+    """Admin panel uchun loyalty va min_amount sozlamalari."""
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        from database import models
+        min_amount = await models.get_min_order_amount()
+        target = await models.get_loyalty_target()
+        return web.json_response({
+            "min_order_amount": min_amount,
+            "loyalty_target": target
+        })
+    except Exception as e:
+        logger.error(f"api_get_loyalty_settings: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+async def api_update_loyalty_settings(request):
+    """Admin paneldan minimal summa va loyalty marrasini yangilash."""
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        from database import models
+        data = await request.json()
+        min_amount = float(data.get("min_order_amount", 70000))
+        target     = int(data.get("loyalty_target", 10))
+        await models.execute_query(
+            "INSERT INTO settings (key, value) VALUES ('min_order_amount', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;",
+            str(int(min_amount))
+        )
+        await models.execute_query(
+            "INSERT INTO settings (key, value) VALUES ('loyalty_target', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;",
+            str(target)
+        )
+        logger.info(f"Loyalty settings updated: min={min_amount}, target={target}")
+        return web.json_response({"success": True})
+    except Exception as e:
+        logger.error(f"api_update_loyalty_settings: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
 # --- FILE UPLOAD (rasm/video - Permanent Cloud Storage) ---
 
 async def upload_image_to_cloud(file_bytes: bytes, filename: str) -> str:
@@ -598,6 +649,12 @@ async def api_miniapp_order(request):
                 return web.json_response({"error": "Bugun uchun tushlik vaqtiga buyurtma olish yopilgan (soat 12:00 dan o'tgan)!"}, status=400)
             if delivery_time_start >= "18:00" and current_hour >= 18:
                 return web.json_response({"error": "Bugun uchun kechqurungi vaqtga buyurtma olish yopilgan (soat 18:00 dan o'tgan)!"}, status=400)
+
+        min_amount = await models.get_min_order_amount()
+        if float(total_price) < min_amount:
+            return web.json_response({
+                "error": f"Minimal buyurtma summasi — {int(min_amount):,} so'm. Hozirgi savatingiz: {int(total_price):,} so'm.".replace(",", " ")
+            }, status=400)
 
         cart_items = [
             {
@@ -1095,6 +1152,11 @@ async def start_web_server():
 
     # Assign courier to order
     app.router.add_post('/api/orders/{id}/assign-courier', api_assign_order_courier)
+
+    # Loyalty & Min amount
+    app.router.add_get('/api/loyalty', api_get_user_loyalty)
+    app.router.add_get('/api/settings/loyalty', api_get_loyalty_settings)
+    app.router.add_post('/api/settings/loyalty', api_update_loyalty_settings)
 
     # --- Static Pages ---
     static_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')

@@ -20,11 +20,31 @@ async def cmd_open_miniapp(message: Message):
     if not user:
         await message.answer("Siz ro'yxatdan o'tmagansiz. /start bosing.")
         return
+
+    loyalty = await models.get_user_loyalty_info(message.from_user.id)
+    bar_str = loyalty.get('progress_bar', '⬜'*10)
+    current = loyalty.get('current_step', 0)
+    target  = loyalty.get('target', 10)
+    rem     = loyalty.get('remaining', 10)
+    min_amt = int(loyalty.get('min_amount', 70000))
+
+    if loyalty.get('is_gift_order'):
+        loyalty_banner = f"🎁 **10-YUBILEY SOVG'ANGIZ SIZNI KUTMOQDA!**\n[ {bar_str} ] {target}/{target}"
+    elif rem == 1:
+        loyalty_banner = f"🔥 **JUDA YA QINS IZ!** Yana 1 ta buyurtma bersangiz SOVG'A olasiz!\n[ {bar_str} ] {current}/{target}"
+    else:
+        loyalty_banner = f"🎁 **Sovg'aga {rem} ta buyurtma qoldi!**\n[ {bar_str} ] {current}/{target}"
+
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="🛒 Buyurtma berish", web_app=WebAppInfo(url=MINIAPP_URL))
     ]])
-    await message.answer("🍊 *Mandarin Supermarket Katalogi*\n\nBuyurtma berish uchun quyidagi '🛒 Buyurtma berish' tugmasini bosing:",
-        reply_markup=keyboard, parse_mode="Markdown")
+    await message.answer(
+        f"🍊 **Mandarin Supermarket Katalogi**\n\n"
+        f"{loyalty_banner}\n"
+        f"💡 *Minimal buyurtma summasi:* {min_amt:,} so'm\n\n".replace(",", " ") +
+        f"Buyurtma berish uchun quyidagi '🛒 Buyurtma berish' tugmasini bosing:",
+        reply_markup=keyboard, parse_mode="Markdown"
+    )
 
 @router.message(F.text == "👤 Profilim")
 async def cmd_profile(message: Message):
@@ -34,11 +54,23 @@ async def cmd_profile(message: Message):
         return
     reg_date = user['created_at'].strftime("%d.%m.%Y %H:%M")
     mfy_text = f"\n📍 *Mahalla:* {user['mfy_name']} MFY" if user.get('mfy_name') else ""
+
+    loyalty = await models.get_user_loyalty_info(message.from_user.id)
+    bar_str = loyalty.get('progress_bar', '⬜'*10)
+    current = loyalty.get('current_step', 0)
+    target  = loyalty.get('target', 10)
+    rem     = loyalty.get('remaining', 10)
+    gifts   = loyalty.get('gifts_earned', 0)
+
     await message.answer(
         f"👤 *Profil:*\n\n"
         f"📝 *Ism:* {user['full_name']}\n"
         f"📞 *Telefon:* {user['phone_number']}{mfy_text}\n"
-        f"📅 *Ro'yxatdan o'tgan:* {reg_date}",
+        f"📅 *Ro'yxatdan o'tgan:* {reg_date}\n\n"
+        f"🎁 *SOVG'A PROGRESSI (10-Yubiley):*\n"
+        f"[ {bar_str} ] {current}/{target}\n"
+        f"🏆 *Olingan sovg'alar:* {gifts} ta\n"
+        f"✨ *Keyingi sovg'agacha:* {rem} ta buyurtma qoldi!",
         parse_mode="Markdown")
 
 @router.message(F.text == "📞 Bog'lanish")

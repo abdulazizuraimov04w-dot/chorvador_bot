@@ -1743,10 +1743,15 @@ function renderCustomers() {
       ? `<a href="https://maps.google.com/?q=${c.latitude},${c.longitude}" target="_blank" class="map-link" style="font-size:11px">📍 Xarita</a>`
       : '';
 
+    const loyaltyBadge = `<span style="background:rgba(255,126,95,0.15);color:#ff7e5f;padding:1px 6px;border-radius:10px;font-size:9px;font-weight:700">🎁 ${c.loyalty_step||0}/10</span>`;
+
     return `<tr>
       <td style="font-size:12px;color:var(--muted)">${i+1}</td>
       <td>
-        <div style="font-weight:600;font-size:13px">${esc(c.full_name||'')}</div>
+        <div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px">
+          ${esc(c.full_name||'')}
+          ${loyaltyBadge}
+        </div>
         <div style="font-size:10px;color:var(--muted);display:flex;gap:4px;align-items:center;margin-top:2px">
           ${c.is_admin ? '<span style="background:rgba(245,158,11,.15);color:#f59e0b;padding:1px 5px;border-radius:8px;font-size:9px">Admin</span>' : ''}
           ${locLink}
