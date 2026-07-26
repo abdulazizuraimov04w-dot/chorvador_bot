@@ -325,17 +325,30 @@ async def api_toggle_product(request):
 # --- CUSTOMERS ---
 
 async def api_get_customers(request):
+    """Barcha mijozlar analitik ma'lumotlar bilan (segment, buyurtmalar, summa va boshqalar)."""
     if not is_authorized(request):
         return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
     try:
         from database import models
-        users = await models.get_all_users()
-        for u in users:
-            if u.get('created_at'):
-                u['created_at'] = u['created_at'].strftime("%Y-%m-%d %H:%M")
-        return web.json_response(users)
+        customers = await models.get_customers_analytics()
+        return web.json_response(customers)
     except Exception as e:
         logger.error(f"api_get_customers: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+async def api_get_customer_detail(request):
+    """Alohida mijoz profili + buyurtmalar tarixi."""
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        from database import models
+        user_id = int(request.match_info['id'])
+        detail = await models.get_customer_detail(user_id)
+        if not detail:
+            return web.json_response({"error": "Mijoz topilmadi!"}, status=404)
+        return web.json_response(detail)
+    except Exception as e:
+        logger.error(f"api_get_customer_detail: {e}")
         return web.json_response({"error": str(e)}, status=500)
 
 # --- FILE UPLOAD (rasm/video - Permanent Cloud Storage) ---
@@ -1043,6 +1056,7 @@ async def start_web_server():
 
     # Customers
     app.router.add_get('/api/customers', api_get_customers)
+    app.router.add_get('/api/customers/{id}', api_get_customer_detail)
 
     # Broadcast
     app.router.add_post('/api/broadcast', api_broadcast)

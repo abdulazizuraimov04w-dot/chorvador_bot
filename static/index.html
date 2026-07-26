@@ -147,6 +147,54 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
 
 /* CUSTOMERS PAGE */
 .customers-table-wrap { overflow-x:auto; }
+.customer-segments { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:20px; }
+.seg-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px 18px; display:flex; flex-direction:column; gap:4px; transition:.2s; }
+.seg-card:hover { border-color:var(--accent); transform:translateY(-2px); }
+.seg-card .seg-icon { font-size:22px; }
+.seg-card .seg-count { font-size:26px; font-weight:700; color:var(--text); line-height:1; }
+.seg-card .seg-label { font-size:11px; color:var(--muted); }
+.seg-card.seg-all   { border-top:3px solid var(--accent); }
+.seg-card.seg-vip   { border-top:3px solid #f59e0b; }
+.seg-card.seg-active{ border-top:3px solid #22c55e; }
+.seg-card.seg-sleep { border-top:3px solid #6b7280; }
+.seg-card.seg-new   { border-top:3px solid #3b82f6; }
+
+/* Segment badges */
+.badge { display:inline-flex; align-items:center; gap:3px; padding:2px 8px; border-radius:20px; font-size:10px; font-weight:600; white-space:nowrap; }
+.badge-vip     { background:rgba(245,158,11,.15); color:#f59e0b; }
+.badge-active  { background:rgba(34,197,94,.15);  color:#22c55e; }
+.badge-sleeping{ background:rgba(107,114,128,.15); color:#9ca3af; }
+.badge-new     { background:rgba(59,130,246,.15);  color:#60a5fa; }
+
+/* Customer filter bar */
+.customer-filter-bar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.customer-filter-bar select { background:var(--surface2); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:12px; padding:7px 12px; outline:none; cursor:pointer; }
+.customer-filter-bar select:focus { border-color:var(--accent); }
+
+/* Customer detail modal */
+#customer-modal .modal-box { max-width:680px; max-height:88vh; overflow-y:auto; }
+.cust-profile-header { display:flex; align-items:center; gap:16px; margin-bottom:20px; }
+.cust-avatar { width:56px; height:56px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent2)); display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:700; color:#fff; flex-shrink:0; }
+.cust-meta { flex:1; }
+.cust-meta h3 { font-size:17px; font-weight:700; margin:0 0 4px; }
+.cust-meta p  { font-size:12px; color:var(--muted); margin:0; }
+
+.cust-stat-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:18px; }
+.cust-stat-box  { background:var(--surface2); border-radius:10px; padding:12px 14px; text-align:center; }
+.cust-stat-box .sv { font-size:20px; font-weight:700; color:var(--accent); }
+.cust-stat-box .sl { font-size:10px; color:var(--muted); margin-top:2px; }
+
+.cust-info-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+.cust-info-chip { background:var(--surface2); border-radius:8px; padding:6px 12px; font-size:12px; display:flex; align-items:center; gap:5px; }
+
+.order-history-list { display:flex; flex-direction:column; gap:8px; }
+.oh-item { background:var(--surface2); border-radius:10px; padding:10px 14px; }
+.oh-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+.oh-id    { font-size:12px; font-weight:600; }
+.oh-date  { font-size:11px; color:var(--muted); }
+.oh-price { font-size:13px; font-weight:700; color:var(--accent); }
+.oh-items { font-size:11px; color:var(--muted); }
+
 
 /* BROADCAST PAGE */
 .broadcast-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:24px; max-width:600px; }
@@ -475,19 +523,82 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
 
       <!-- CUSTOMERS -->
       <div class="page" id="page-customers">
+        <!-- Segment kartalar -->
+        <div class="customer-segments" id="customer-segments">
+          <div class="seg-card seg-all" style="cursor:pointer" onclick="setSegmentFilter('all',this)">
+            <span class="seg-icon">👥</span>
+            <span class="seg-count" id="seg-count-all">—</span>
+            <span class="seg-label">Jami mijozlar</span>
+          </div>
+          <div class="seg-card seg-active" style="cursor:pointer" onclick="setSegmentFilter('active',this)">
+            <span class="seg-icon">🟢</span>
+            <span class="seg-count" id="seg-count-active">—</span>
+            <span class="seg-label">Faol (30 kun ichida)</span>
+          </div>
+          <div class="seg-card seg-vip" style="cursor:pointer" onclick="setSegmentFilter('vip',this)">
+            <span class="seg-icon">👑</span>
+            <span class="seg-count" id="seg-count-vip">—</span>
+            <span class="seg-label">VIP (500k+ so'm)</span>
+          </div>
+          <div class="seg-card seg-sleep" style="cursor:pointer" onclick="setSegmentFilter('sleeping',this)">
+            <span class="seg-icon">😴</span>
+            <span class="seg-count" id="seg-count-sleeping">—</span>
+            <span class="seg-label">Uyquda (>30 kun)</span>
+          </div>
+          <div class="seg-card seg-new" style="cursor:pointer" onclick="setSegmentFilter('new',this)">
+            <span class="seg-icon">🆕</span>
+            <span class="seg-count" id="seg-count-new">—</span>
+            <span class="seg-label">Yangi (0 buyurtma)</span>
+          </div>
+        </div>
+
         <div class="table-card">
           <div class="table-header">
             <div class="card-title">Mijozlar bazasi</div>
-            <div class="search-box">🔍 <input type="text" id="customer-search" placeholder="Ism, telefon..." oninput="filterCustomers()"></div>
+            <div class="customer-filter-bar">
+              <div class="search-box">🔍 <input type="text" id="customer-search" placeholder="Ism, telefon..." oninput="filterCustomers()"></div>
+              <select id="customer-sort" onchange="filterCustomers()">
+                <option value="spent_desc">💰 Eng ko'p sarflagan</option>
+                <option value="orders_desc">📦 Buyurtmalar soni</option>
+                <option value="last_order">📅 Oxirgi xarid</option>
+                <option value="created_desc">🕐 Ro'yxat sanasi</option>
+              </select>
+            </div>
           </div>
           <div class="customers-table-wrap">
             <table>
-              <thead><tr><th>#</th><th>Ism</th><th>Telefon</th><th>Mahalla (MFY)</th><th>Lokatsiya</th><th>Ro'yxatdan o'tgan</th></tr></thead>
-              <tbody id="customers-body"><tr><td colspan="6"><div class="loader"><div class="spinner"></div></div></td></tr></tbody>
+              <thead><tr>
+                <th>#</th>
+                <th>Mijoz</th>
+                <th>Telefon</th>
+                <th>Segment</th>
+                <th>📦 Buyurtmalar</th>
+                <th>💰 Jami summa</th>
+                <th>📊 O'rtacha</th>
+                <th>❤️ Sevimli mahsulot</th>
+                <th>📅 Oxirgi xarid</th>
+                <th>Amal</th>
+              </tr></thead>
+              <tbody id="customers-body"><tr><td colspan="10"><div class="loader"><div class="spinner"></div></div></td></tr></tbody>
             </table>
           </div>
         </div>
       </div>
+
+      <!-- CUSTOMER DETAIL MODAL -->
+      <div class="modal-overlay" id="customer-modal">
+        <div class="modal-box">
+          <div class="modal-header">
+            <div class="modal-title" id="cust-modal-title">Mijoz profili</div>
+            <button class="modal-close" onclick="document.getElementById('customer-modal').classList.remove('open')">✕</button>
+          </div>
+          <div id="customer-modal-body">
+            <div class="loader"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </div>
+
+
 
       <!-- BROADCAST -->
       <div class="page" id="page-broadcast">
@@ -1560,33 +1671,177 @@ async function toggleProduct(id, is_active) {
 }
 
 // ==================== CUSTOMERS ====================
+let activeSegmentFilter = 'all';
+
+const SEGMENT_LABELS = {
+  vip:      { label:'👑 VIP',     cls:'badge-vip' },
+  active:   { label:'🟢 Faol',    cls:'badge-active' },
+  sleeping: { label:'😴 Uyqu',    cls:'badge-sleeping' },
+  new:      { label:'🆕 Yangi',   cls:'badge-new' }
+};
+
+function segBadge(seg) {
+  const s = SEGMENT_LABELS[seg] || { label: seg, cls: '' };
+  return `<span class="badge ${s.cls}">${s.label}</span>`;
+}
+
 async function loadCustomers() {
-  document.getElementById('customers-body').innerHTML = '<tr><td colspan="6"><div class="loader"><div class="spinner"></div></div></td></tr>';
+  document.getElementById('customers-body').innerHTML = '<tr><td colspan="10"><div class="loader"><div class="spinner"></div></div></td></tr>';
   const data = await api('/api/customers');
   if (!data) return;
-  allCustomers = Array.isArray(data) ? data : (data.customers || []);
+  allCustomers = Array.isArray(data) ? data : [];
+
+  // Segment kartalar sonlarini hisoblash
+  const counts = { all: allCustomers.length, vip: 0, active: 0, sleeping: 0, new: 0 };
+  allCustomers.forEach(c => { if (counts[c.segment] !== undefined) counts[c.segment]++; });
+  document.getElementById('seg-count-all').textContent      = counts.all;
+  document.getElementById('seg-count-vip').textContent      = counts.vip;
+  document.getElementById('seg-count-active').textContent   = counts.active;
+  document.getElementById('seg-count-sleeping').textContent = counts.sleeping;
+  document.getElementById('seg-count-new').textContent      = counts.new;
+
   renderCustomers();
+}
+
+function setSegmentFilter(seg, card) {
+  activeSegmentFilter = seg;
+  document.querySelectorAll('.seg-card').forEach(c => c.style.boxShadow = '');
+  if (card) card.style.boxShadow = '0 0 0 2px var(--accent)';
+  filterCustomers();
 }
 
 function filterCustomers() { renderCustomers(); }
 
 function renderCustomers() {
-  const q = document.getElementById('customer-search').value.toLowerCase();
-  const data = allCustomers.filter(c =>
-    !q || c.full_name?.toLowerCase().includes(q) || c.phone_number?.includes(q)
-  );
+  const q    = (document.getElementById('customer-search')?.value || '').toLowerCase();
+  const sort = document.getElementById('customer-sort')?.value || 'spent_desc';
+
+  let data = allCustomers.filter(c => {
+    const matchSeg  = activeSegmentFilter === 'all' || c.segment === activeSegmentFilter;
+    const matchQ    = !q || c.full_name?.toLowerCase().includes(q) || c.phone_number?.includes(q);
+    return matchSeg && matchQ;
+  });
+
+  // Saralash
+  if (sort === 'spent_desc')   data.sort((a,b) => b.total_spent - a.total_spent);
+  if (sort === 'orders_desc')  data.sort((a,b) => b.total_orders - a.total_orders);
+  if (sort === 'last_order')   data.sort((a,b) => (a.last_order_date||'') < (b.last_order_date||'') ? 1 : -1);
+  if (sort === 'created_desc') data.sort((a,b) => (a.created_at||'') < (b.created_at||'') ? 1 : -1);
+
   const tbody = document.getElementById('customers-body');
-  tbody.innerHTML = data.length
-    ? data.map((c, i) => `<tr>
-        <td>${i+1}</td>
-        <td><b>${esc(c.full_name||'')}</b>${c.is_admin ? ' <span style="font-size:10px;background:rgba(245,158,11,.15);color:var(--yellow);padding:1px 6px;border-radius:10px;">Admin</span>' : ''}</td>
-        <td>${c.phone_number||''}</td>
-        <td>${esc(c.branch_name||'—')}</td>
-        <td>${c.latitude && c.longitude ? `<a href="https://maps.google.com/?q=${c.latitude},${c.longitude}" target="_blank" class="map-link">📍 Ko'rish</a>` : '—'}</td>
-        <td style="font-size:12px;color:var(--muted)">${fmtDate(c.created_at)}</td>
-      </tr>`).join('')
-    : '<tr><td colspan="6"><div class="empty-state"><div class="emoji">👥</div><p>Mijozlar topilmadi</p></div></td></tr>';
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="emoji">👥</div><p>Mijozlar topilmadi</p></div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = data.map((c, i) => {
+    const lastOrder = c.last_order_date
+      ? `<span style="font-size:11px">${c.last_order_date.slice(0,10)}</span><br><span style="font-size:10px;color:var(--muted)">${c.days_since_last_order < 9999 ? c.days_since_last_order + ' kun oldin' : '—'}</span>`
+      : '<span style="color:var(--muted);font-size:11px">—</span>';
+
+    const locLink = c.latitude && c.longitude
+      ? `<a href="https://maps.google.com/?q=${c.latitude},${c.longitude}" target="_blank" class="map-link" style="font-size:11px">📍 Xarita</a>`
+      : '';
+
+    return `<tr>
+      <td style="font-size:12px;color:var(--muted)">${i+1}</td>
+      <td>
+        <div style="font-weight:600;font-size:13px">${esc(c.full_name||'')}</div>
+        <div style="font-size:10px;color:var(--muted);display:flex;gap:4px;align-items:center;margin-top:2px">
+          ${c.is_admin ? '<span style="background:rgba(245,158,11,.15);color:#f59e0b;padding:1px 5px;border-radius:8px;font-size:9px">Admin</span>' : ''}
+          ${locLink}
+          <span>${fmtDate(c.created_at)}</span>
+        </div>
+      </td>
+      <td style="font-size:12px">${c.phone_number||'—'}</td>
+      <td>${segBadge(c.segment)}</td>
+      <td style="text-align:center;font-weight:600">${c.total_orders}</td>
+      <td style="font-weight:700;color:var(--accent)">${c.total_spent > 0 ? (c.total_spent/1000).toFixed(0)+'K so\'m' : '—'}</td>
+      <td style="font-size:12px;color:var(--muted)">${c.avg_order_value > 0 ? (c.avg_order_value/1000).toFixed(0)+'K' : '—'}</td>
+      <td style="font-size:11px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.favorite_product||'—')}</td>
+      <td>${lastOrder}</td>
+      <td>
+        <button class="btn-sm" onclick="openCustomerModal(${c.id})" style="font-size:11px;padding:4px 10px">👁 Ko'rish</button>
+      </td>
+    </tr>`;
+  }).join('');
 }
+
+async function openCustomerModal(userId) {
+  document.getElementById('customer-modal').classList.add('open');
+  document.getElementById('cust-modal-title').textContent = 'Mijoz profili yuklanmoqda...';
+  document.getElementById('customer-modal-body').innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+
+  const c = await api(`/api/customers/${userId}`);
+  if (!c || c.error) {
+    document.getElementById('customer-modal-body').innerHTML = `<p style="color:red">Xatolik: ${c?.error||'yuklanmadi'}</p>`;
+    return;
+  }
+
+  document.getElementById('cust-modal-title').textContent = c.full_name || 'Mijoz profili';
+
+  const initials = (c.full_name||'?').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+  const locLink  = c.latitude && c.longitude
+    ? `<a href="https://maps.google.com/?q=${c.latitude},${c.longitude}" target="_blank" class="map-link">📍 Lokatsiyani ko'rish</a>`
+    : '<span style="color:var(--muted)">📍 Lokatsiya yo\'q</span>';
+
+  const daysAgo = c.days_since_last_order < 9999 ? `${c.days_since_last_order} kun oldin` : 'Hali xarid qilmagan';
+
+  const ordersHtml = (c.orders||[]).length
+    ? (c.orders||[]).map(o => {
+        const statusBadge = {confirmed:'🔵 Tasdiqlangan', completed:'✅ Bajarildi', pending:'🟡 Kutilmoqda', cancelled:'❌ Bekor'}[o.status] || o.status;
+        const items = (o.items||[]).filter(it=>it.product_name).map(it=>`${it.product_name} × ${it.quantity}`).join(', ');
+        return `<div class="oh-item">
+          <div class="oh-header">
+            <span class="oh-id">#${o.order_id}</span>
+            <span class="oh-date">${o.created_at}</span>
+            <span class="oh-price">${(o.total_price/1000).toFixed(0)}K so'm</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span class="oh-items">${items||'—'}</span>
+            <span style="font-size:10px">${statusBadge}</span>
+          </div>
+        </div>`;
+      }).join('')
+    : '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px">Buyurtmalar yo\'q</div>';
+
+  document.getElementById('customer-modal-body').innerHTML = `
+    <div class="cust-profile-header">
+      <div class="cust-avatar">${initials}</div>
+      <div class="cust-meta">
+        <h3>${esc(c.full_name||'')}</h3>
+        <p>Ro'yxatdan o'tgan: ${fmtDate(c.created_at)} &nbsp;·&nbsp; ${segBadge(c.segment)}</p>
+      </div>
+    </div>
+
+    <div class="cust-info-row">
+      <div class="cust-info-chip">📱 ${c.phone_number||'—'}</div>
+      <div class="cust-info-chip">🆔 TG: ${c.telegram_id||'—'}</div>
+      <div class="cust-info-chip">${locLink}</div>
+      ${c.favorite_product ? `<div class="cust-info-chip">❤️ ${esc(c.favorite_product)}</div>` : ''}
+      <div class="cust-info-chip">⏱ Oxirgi xarid: ${daysAgo}</div>
+    </div>
+
+    <div class="cust-stat-grid">
+      <div class="cust-stat-box">
+        <div class="sv">${c.total_orders}</div>
+        <div class="sl">Jami buyurtmalar</div>
+      </div>
+      <div class="cust-stat-box">
+        <div class="sv">${(c.total_spent/1000).toFixed(0)}K</div>
+        <div class="sl">Jami sarflagan (so'm)</div>
+      </div>
+      <div class="cust-stat-box">
+        <div class="sv">${(c.avg_order_value/1000).toFixed(0)}K</div>
+        <div class="sl">O'rtacha xarid</div>
+      </div>
+    </div>
+
+    <div style="font-size:13px;font-weight:600;margin-bottom:10px">📋 Buyurtmalar tarixi (so'nggi 50 ta)</div>
+    <div class="order-history-list">${ordersHtml}</div>
+  `;
+}
+
 
 // ==================== BROADCAST ====================
 async function loadBroadcastInfo() {

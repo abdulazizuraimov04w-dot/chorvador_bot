@@ -241,6 +241,158 @@ async def get_all_users() -> List[Dict[str, Any]]:
 async def update_user_admin_status(telegram_id: int, is_admin: bool):
     await execute_query("UPDATE users SET is_admin = $1 WHERE telegram_id = $2;", is_admin, telegram_id)
 
+async def get_customers_analytics() -> List[Dict[str, Any]]:
+    """Barcha mijozlar haqida to'liq analitik ma'lumotlar (buyurtmalar, summa, segment va boshqalar)."""
+    rows = await fetch_rows("""
+        SELECT
+            u.id,
+            u.telegram_id,
+            u.full_name,
+            u.phone_number,
+            u.latitude,
+            u.longitude,
+            u.is_admin,
+            u.created_at,
+
+            -- Buyurtmalar statistikasi
+            COUNT(o.id)                                         AS total_orders,
+            COALESCE(SUM(o.total_price), 0)                    AS total_spent,
+            COALESCE(AVG(o.total_price), 0)                    AS avg_order_value,
+            MAX(o.created_at)                                  AS last_order_date,
+            MIN(o.created_at)                                  AS first_order_date,
+
+            -- Oxirgi buyurtmadan necha kun o'tdi
+            COALESCE(
+                EXTRACT(DAY FROM NOW() - MAX(o.created_at))::int,
+                9999
+            )                                                  AS days_since_last_order,
+
+            -- Eng sevimli mahsulot (eng ko'p buyurtma qilingan)
+            (
+                SELECT p2.name
+                FROM order_items oi2
+                JOIN products p2 ON oi2.product_id = p2.id
+                JOIN orders o2 ON oi2.order_id = o2.id
+                WHERE o2.user_id = u.id
+                  AND o2.status IN ('confirmed','completed')
+                GROUP BY p2.name
+                ORDER BY SUM(oi2.quantity) DESC
+                LIMIT 1
+            )                                                  AS favorite_product,
+
+            -- Mijoz segmenti
+            CASE
+                WHEN COUNT(o.id) = 0 THEN 'new'
+                WHEN COALESCE(SUM(o.total_price), 0) >= 500000 THEN 'vip'
+                WHEN COALESCE(EXTRACT(DAY FROM NOW() - MAX(o.created_at))::int, 9999) <= 30 THEN 'active'
+                ELSE 'sleeping'
+            END                                                AS segment
+
+        FROM users u
+        LEFT JOIN orders o
+            ON o.user_id = u.id
+            AND o.status IN ('confirmed','completed')
+        GROUP BY u.id
+        ORDER BY total_spent DESC, u.created_at DESC;
+    """)
+    result = []
+    for r in rows:
+        d = dict(r)
+        if d.get('created_at'):
+            d['created_at'] = d['created_at'].strftime("%Y-%m-%d %H:%M")
+        if d.get('last_order_date'):
+            d['last_order_date'] = d['last_order_date'].strftime("%Y-%m-%d %H:%M")
+        if d.get('first_order_date'):
+            d['first_order_date'] = d['first_order_date'].strftime("%Y-%m-%d %H:%M")
+        d['total_spent']     = float(d['total_spent'])
+        d['avg_order_value'] = float(d['avg_order_value'])
+        d['total_orders']    = int(d['total_orders'])
+        d['days_since_last_order'] = int(d['days_since_last_order'])
+        result.append(d)
+    return result
+
+async def get_customer_detail(user_id: int) -> Optional[Dict[str, Any]]:
+    """Alohida mijoz profili + barcha buyurtmalar tarixi."""
+    user_row = await fetch_row("""
+        SELECT
+            u.id, u.telegram_id, u.full_name, u.phone_number,
+            u.latitude, u.longitude, u.is_admin, u.created_at,
+            COUNT(o.id)                         AS total_orders,
+            COALESCE(SUM(o.total_price), 0)    AS total_spent,
+            COALESCE(AVG(o.total_price), 0)    AS avg_order_value,
+            MAX(o.created_at)                   AS last_order_date,
+            COALESCE(EXTRACT(DAY FROM NOW() - MAX(o.created_at))::int, 9999) AS days_since_last_order,
+            (
+                SELECT p2.name
+                FROM order_items oi2
+                JOIN products p2 ON oi2.product_id = p2.id
+                JOIN orders o2 ON oi2.order_id = o2.id
+                WHERE o2.user_id = u.id AND o2.status IN ('confirmed','completed')
+                GROUP BY p2.name ORDER BY SUM(oi2.quantity) DESC LIMIT 1
+            ) AS favorite_product,
+            CASE
+                WHEN COUNT(o.id) = 0 THEN 'new'
+                WHEN COALESCE(SUM(o.total_price), 0) >= 500000 THEN 'vip'
+                WHEN COALESCE(EXTRACT(DAY FROM NOW() - MAX(o.created_at))::int, 9999) <= 30 THEN 'active'
+                ELSE 'sleeping'
+            END AS segment
+        FROM users u
+        LEFT JOIN orders o ON o.user_id = u.id AND o.status IN ('confirmed','completed')
+        WHERE u.id = $1
+        GROUP BY u.id;
+    """, user_id)
+
+    if not user_row:
+        return None
+
+    user = dict(user_row)
+    if user.get('created_at'):
+        user['created_at'] = user['created_at'].strftime("%Y-%m-%d %H:%M")
+    if user.get('last_order_date'):
+        user['last_order_date'] = user['last_order_date'].strftime("%Y-%m-%d %H:%M")
+    user['total_spent']     = float(user['total_spent'])
+    user['avg_order_value'] = float(user['avg_order_value'])
+    user['total_orders']    = int(user['total_orders'])
+    user['days_since_last_order'] = int(user['days_since_last_order'])
+
+    # Buyurtmalar tarixi
+    orders_rows = await fetch_rows("""
+        SELECT
+            o.id AS order_id,
+            o.status,
+            o.total_price,
+            o.delivery_date,
+            o.created_at,
+            o.delivery_time_start,
+            o.delivery_time_end,
+            array_to_json(array_agg(json_build_object(
+                'product_name', p.name,
+                'quantity',     oi.quantity,
+                'price',        oi.price_at_purchase
+            ))) AS items
+        FROM orders o
+        LEFT JOIN order_items oi ON oi.order_id = o.id
+        LEFT JOIN products p ON p.id = oi.product_id
+        WHERE o.user_id = $1
+        GROUP BY o.id
+        ORDER BY o.created_at DESC
+        LIMIT 50;
+    """, user_id)
+
+    import json
+    orders = []
+    for r in orders_rows:
+        od = dict(r)
+        od['total_price']   = float(od['total_price'])
+        od['delivery_date'] = od['delivery_date'].strftime("%d.%m.%Y") if od.get('delivery_date') else ''
+        od['created_at']    = od['created_at'].strftime("%d.%m.%Y %H:%M") if od.get('created_at') else ''
+        if isinstance(od.get('items'), str):
+            od['items'] = json.loads(od['items'])
+        orders.append(od)
+
+    user['orders'] = orders
+    return user
+
 # --- CATEGORY METHODS ---
 
 async def get_all_categories() -> List[Dict[str, Any]]:
