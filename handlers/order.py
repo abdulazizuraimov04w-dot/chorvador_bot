@@ -271,7 +271,6 @@ async def confirm_order(callback: CallbackQuery, state: FSMContext):
         loyalty_msg = f"\n\n{loyalty.get('text', '')}"
         await callback.message.edit_text(
             f"✅ **Buyurtmangiz qabul qilindi!**\n\n"
-            f"⏰ **Yetkazib berish vaqti:** 06:30 - 07:30\n"
             f"📦 **Buyurtma raqami:** #{order_id}"
             f"{gift_banner}"
             f"{loyalty_msg}",
@@ -326,7 +325,6 @@ async def confirm_order(callback: CallbackQuery, state: FSMContext):
             f"**Telefon:** {user['phone_number']}\n"
             f"{mfy_info}"
             f"{courier_info}"
-            f"**Yetkazish vaqti:** 06:30 - 07:30 (Ertaga)\n\n"
             f"**Mahsulotlar:**\n{items_text}\n"
             f"💵 **Jami summa:** {int(total_price):,} so'm\n\n".replace(",", " ") +
             f"*Batafsil ma'lumot va boshqarish uchun Web Panelga kiring!*"
@@ -351,8 +349,7 @@ async def confirm_order(callback: CallbackQuery, state: FSMContext):
                     f"**Hudud (MFY):** {mfy_name} MFY\n"
                     f"**Buyurtma:** #{order_id}\n"
                     f"**Mijoz:** {user['full_name']}\n"
-                    f"**Telefon:** {user['phone_number']}\n"
-                    f"**Yetkazish vaqti:** 06:30 - 07:30 (Ertaga)\n\n"
+                    f"**Telefon:** {user['phone_number']}\n\n"
                     f"**Mahsulotlar:**\n{items_text}\n"
                     f"💵 **Jami:** {int(total_price):,} so'm\n"
                     f"{loc_link}"
