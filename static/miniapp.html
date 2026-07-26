@@ -533,19 +533,28 @@ function renderLoyaltyCard() {
 }
 
 async function loadProducts() {
-  const [prodData, catData] = await Promise.all([
-    apiFetch('/api/products'),
-    apiFetch('/api/categories')
-  ]);
-  loadLoyaltyInfo();
-  const minDelay = new Promise(r => setTimeout(r, 1200));
-  await minDelay;
-  hideSplash();
-  if (!prodData) { showToast('Xatolik yuz berdi'); return; }
-  products = Array.isArray(prodData) ? prodData.filter(p => p.is_active) : [];
-  categories = Array.isArray(catData) ? catData : [];
-  renderCategoryTabs();
-  renderProducts();
+  // Safety timeout to ensure splash screen hides even on slow network
+  setTimeout(hideSplash, 2500);
+
+  try {
+    const [prodData, catData] = await Promise.all([
+      apiFetch('/api/products'),
+      apiFetch('/api/categories')
+    ]);
+    loadLoyaltyInfo();
+    if (prodData) {
+      products = Array.isArray(prodData) ? prodData.filter(p => p.is_active) : [];
+      categories = Array.isArray(catData) ? catData : [];
+      renderCategoryTabs();
+      renderProducts();
+    } else {
+      showToast('Mahsulotlarni yuklab bo\'lmadi');
+    }
+  } catch (err) {
+    console.error('loadProducts error:', err);
+  } finally {
+    hideSplash();
+  }
 }
 
 function renderCart() {
@@ -577,15 +586,11 @@ function renderCart() {
       fill.classList.add('ok');
       sub.innerHTML = `<b style="color:var(--accent)">🎉 Minimal summagaga yetildi! Usbu buyurtma +1 SOVG'A qadami beradi!</b>`;
       btn.disabled = false;
-      btn.textContent = 'Buyurtma berish →';
-    } else {
-      fill.classList.remove('ok');
-      const diff = minAmount - total;
-      sub.innerHTML = `⚠️ Minimal buyurtma summasi ${fmtPrice(minAmount)} so'm. Yana <b>${fmtPrice(diff)} so'mlik</b> mahsulot qo'shing.`;
       btn.disabled = true;
       btn.textContent = `Yana ${fmtPrice(diff)} so'm qo'shing`;
     }
   }
+}
 
 function renderCategoryTabs() {
   const wrap = document.getElementById('category-tabs-wrap');
