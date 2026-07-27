@@ -32,7 +32,7 @@ scheduler_task = None
 import hashlib
 
 def get_auth_token():
-    pwd = os.getenv("DASHBOARD_PASSWORD", "KiRishgA UrinmA")
+    pwd = os.getenv("DASHBOARD_PASSWORD", "ozimniki2604")
     return hashlib.sha256(pwd.encode()).hexdigest()
 
 def is_authorized(request):
