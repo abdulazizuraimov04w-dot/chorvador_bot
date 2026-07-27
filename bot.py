@@ -86,7 +86,7 @@ async def api_login(request):
     try:
         data = await request.json()
         pwd = data.get("password")
-        if pwd == os.getenv("DASHBOARD_PASSWORD", "KiRishgA UrinmA"):
+        if pwd == os.getenv("DASHBOARD_PASSWORD", "ozimniki2604"):
             logger.info("Panel kirish: muvaffaqiyatli")
             return web.json_response({"token": get_auth_token()})
         logger.warning("Panel kirish: noto'g'ri parol")
