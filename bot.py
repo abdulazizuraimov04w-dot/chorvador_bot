@@ -31,9 +31,10 @@ scheduler_task = None
 # ============================================================
 import hashlib
 
+DASHBOARD_PASSWORD = "ozimniki2604"
+
 def get_auth_token():
-    pwd = os.getenv("DASHBOARD_PASSWORD", "ozimniki2604")
-    return hashlib.sha256(pwd.encode()).hexdigest()
+    return hashlib.sha256(DASHBOARD_PASSWORD.encode()).hexdigest()
 
 def is_authorized(request):
     auth = request.headers.get("Authorization", "")
@@ -86,7 +87,7 @@ async def api_login(request):
     try:
         data = await request.json()
         pwd = data.get("password")
-        if pwd == os.getenv("DASHBOARD_PASSWORD", "ozimniki2604"):
+        if pwd == DASHBOARD_PASSWORD:
             logger.info("Panel kirish: muvaffaqiyatli")
             return web.json_response({"token": get_auth_token()})
         logger.warning("Panel kirish: noto'g'ri parol")
