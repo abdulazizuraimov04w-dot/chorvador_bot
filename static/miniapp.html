@@ -739,35 +739,10 @@ async function fetchDeliveryFee(items) {
 // ORDER FORM
 // ============================================================
 function renderOrderForm() {
-  const today=new Date(), tomorrow=new Date(today); tomorrow.setDate(today.getDate()+1);
-  document.getElementById('today-label').textContent    = formatDateLabel(today);
-  document.getElementById('tomorrow-label').textContent = formatDateLabel(tomorrow);
-  
-  // Vaqt cheklovlarini tekshirish
-  const now = new Date();
-  const currentHour = now.getHours();
-  const dayTodayBtn = document.getElementById('day-today');
-  
-  // Agar soat 23:00 dan o'tgan bo'lsa, Bugun uchun barcha slotlar tugagan
-  if (currentHour >= 23) {
-    dayTodayBtn.disabled = true;
-    if (selectedDay === 'today') {
-      selectedDay = 'tomorrow';
-      document.getElementById('day-today').classList.remove('selected');
-      document.getElementById('day-tomorrow').classList.add('selected');
-    }
-  } else if (currentHour < 9) {
-    // Hali ochilmagan
-    dayTodayBtn.disabled = false;
-  } else {
-    dayTodayBtn.disabled = false;
-  }
-  
-  updateTimeButtons(currentHour);
-
   const items = getCartItems();
   const total = items.reduce((s,i) => s+i.subtotal, 0);
   const grandTotal = total + (deliveryFeeAmount || 0);
+
   document.getElementById('order-preview').innerHTML = items.length
     ? items.map(i => `
         <div class="order-preview-row">
@@ -779,6 +754,7 @@ function renderOrderForm() {
        </div>
        <div class="order-preview-total"><span>Jami to'lov</span><span class="val">${fmtPrice(grandTotal)} so'm</span></div>`
     : '<div style="color:var(--muted);font-size:13px;">Savat bo\'sh</div>';
+
   if (userLocation) {
     document.getElementById('location-name').textContent  = 'Yangi manzil tanlandi';
     document.getElementById('location-coords').textContent = `${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}`;
@@ -786,56 +762,10 @@ function renderOrderForm() {
   document.getElementById('confirm-btn').textContent = `✅ Tasdiqlash — ${fmtPrice(grandTotal)} so'm`;
 }
 
-function updateTimeButtons(currentHour) {
-  const timeMorningBtn = document.getElementById('time-morning');
-  const timeNoonBtn    = document.getElementById('time-noon');
-  const timeEveningBtn = document.getElementById('time-evening');
-  
-  if (selectedDay === 'today') {
-    // Bugun uchun cheklovlar: soat o'tgan slotlarni bloklash
-    timeMorningBtn.disabled = currentHour >= 12; // Ertalab 09-12
-    timeNoonBtn.disabled    = currentHour >= 17; // Kunduz 12-17
-    timeEveningBtn.disabled = currentHour >= 23; // Kechqurun 17-23
-    
-    // Agar faol tanlangan slot bloklangan bo'lsa, keyingisiga o'tkazish
-    if (selectedTime === 'morning' && timeMorningBtn.disabled) {
-      if (!timeNoonBtn.disabled)    { selectTime('noon');    }
-      else if (!timeEveningBtn.disabled) { selectTime('evening'); }
-    }
-    if (selectedTime === 'noon' && timeNoonBtn.disabled) {
-      if (!timeEveningBtn.disabled) { selectTime('evening'); }
-    }
-      if (!timeEveningBtn.disabled) {
-        selectTime('evening');
-      }
-    }
-  } else {
-    // Ertaga uchun cheklovlar yo'q
-    timeMorningBtn.disabled = false;
-    timeNoonBtn.disabled = false;
-    timeEveningBtn.disabled = false;
-  }
-}
+function updateTimeButtons(currentHour) { /* time slots removed */ }
 
-function selectDay(day) {
-  const btn = document.getElementById('day-' + day);
-  if (btn && btn.disabled) return;
-  
-  selectedDay=day;
-  document.getElementById('day-today').classList.toggle('selected',day==='today');
-  document.getElementById('day-tomorrow').classList.toggle('selected',day==='tomorrow');
-  
-  const now = new Date();
-  updateTimeButtons(now.getHours());
-}
-
-function selectTime(time) {
-  const btn = document.getElementById('time-' + time);
-  if (btn && btn.disabled) return;
-  
-  selectedTime=time;
-  ['morning','noon','evening'].forEach(t=>document.getElementById('time-'+t).classList.toggle('selected',t===time));
-}
+function selectDay(day) { selectedDay = day; }
+function selectTime(time) { selectedTime = time; }
 function requestLocation() {
   tg.showPopup({title:'Manzil',message:'Joriy joylashuvingizni aniqlaylikmi?',
     buttons:[{id:'yes',type:'default',text:'Ha, aniqlash'},{id:'no',type:'cancel',text:'Yo\'q'}]
