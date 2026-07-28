@@ -274,10 +274,12 @@ async def api_add_product(request):
         price = data.get("price")
         image_url = data.get("image_url")
         category_id = data.get("category_id")
+        restaurant_id = data.get("restaurant_id")
         if not name or price is None:
             return web.json_response({"error": "Nom va narx kiritilishi shart!"}, status=400)
-        cat_id = int(category_id) if category_id else None
-        product = await models.add_product(name, Decimal(str(price)), image_url, cat_id)
+        cat_id  = int(category_id)  if category_id  else None
+        rest_id = int(restaurant_id) if restaurant_id else None
+        product = await models.add_product(name, Decimal(str(price)), image_url, cat_id, rest_id)
         product['price'] = float(product['price'])
         if product.get('created_at'):
             product['created_at'] = product['created_at'].strftime("%Y-%m-%d %H:%M")
@@ -298,10 +300,12 @@ async def api_update_product(request):
         price = data.get("price")
         image_url = data.get("image_url")
         category_id = data.get("category_id")
+        restaurant_id = data.get("restaurant_id")
         if not name or price is None:
             return web.json_response({"error": "Nom va narx kiritilishi shart!"}, status=400)
-        cat_id = int(category_id) if category_id else None
-        await models.update_product(product_id, name, Decimal(str(price)), image_url, cat_id)
+        cat_id  = int(category_id)  if category_id  else None
+        rest_id = int(restaurant_id) if restaurant_id else None
+        await models.update_product(product_id, name, Decimal(str(price)), image_url, cat_id, rest_id)
         logger.info(f"Mahsulot #{product_id} yangilandi: {name}, {price}")
         return web.json_response({"success": True})
     except Exception as e:
@@ -1072,6 +1076,127 @@ async def api_assign_order_courier(request):
 
 
 # ============================================================
+# --- RESTAURANTS ---
+
+async def api_get_restaurants(request):
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        from database import models
+        restaurants = await models.get_all_restaurants()
+        for r in restaurants:
+            if 'created_at' in r and r['created_at']:
+                r['created_at'] = r['created_at'].strftime('%d.%m.%Y %H:%M')
+        return web.json_response(restaurants)
+    except Exception as e:
+        logger.error(f"api_get_restaurants: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+async def api_create_restaurant(request):
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        from database import models
+        data = await request.json()
+        name      = data.get('name', '').strip()
+        phone     = data.get('phone', '').strip()
+        address   = data.get('address', '').strip()
+        latitude  = float(data.get('latitude', 41.2995))
+        longitude = float(data.get('longitude', 69.2401))
+        if not name:
+            return web.json_response({"error": "Oshxona nomi kiritilmagan!"}, status=400)
+        restaurant = await models.create_restaurant(name, phone, address, latitude, longitude)
+        if 'created_at' in restaurant and restaurant['created_at']:
+            restaurant['created_at'] = restaurant['created_at'].strftime('%d.%m.%Y %H:%M')
+        return web.json_response(restaurant)
+    except Exception as e:
+        logger.error(f"api_create_restaurant: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+async def api_update_restaurant(request):
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        from database import models
+        r_id = int(request.match_info['id'])
+        data = await request.json()
+        name      = data.get('name', '').strip()
+        phone     = data.get('phone', '').strip()
+        address   = data.get('address', '').strip()
+        latitude  = float(data.get('latitude', 41.2995))
+        longitude = float(data.get('longitude', 69.2401))
+        is_active = bool(data.get('is_active', True))
+        if not name:
+            return web.json_response({"error": "Oshxona nomi kiritilmagan!"}, status=400)
+        restaurant = await models.update_restaurant(r_id, name, phone, address, latitude, longitude, is_active)
+        if not restaurant:
+            return web.json_response({"error": "Oshxona topilmadi!"}, status=404)
+        if 'created_at' in restaurant and restaurant['created_at']:
+            restaurant['created_at'] = restaurant['created_at'].strftime('%d.%m.%Y %H:%M')
+        return web.json_response(restaurant)
+    except Exception as e:
+        logger.error(f"api_update_restaurant: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+async def api_delete_restaurant(request):
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        from database import models
+        r_id = int(request.match_info['id'])
+        await models.delete_restaurant(r_id)
+        return web.json_response({"success": True})
+    except Exception as e:
+        logger.error(f"api_delete_restaurant: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+async def api_get_delivery_settings(request):
+    """Yetkazib berish narxi sozlamalarini olish."""
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        from database import models
+        s = await models.get_delivery_fee_settings()
+        return web.json_response(s)
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+async def api_save_delivery_settings(request):
+    """Yetkazib berish narxi sozlamalarini saqlash."""
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        from database import models
+        data = await request.json()
+        fee_per_km = str(float(data.get('delivery_fee_per_km', 2000)))
+        min_fee    = str(float(data.get('delivery_min_fee', 3000)))
+        await models.execute_query(
+            "INSERT INTO settings(key,value) VALUES('delivery_fee_per_km',$1) ON CONFLICT(key) DO UPDATE SET value=$1;",
+            fee_per_km
+        )
+        await models.execute_query(
+            "INSERT INTO settings(key,value) VALUES('delivery_min_fee',$1) ON CONFLICT(key) DO UPDATE SET value=$1;",
+            min_fee
+        )
+        return web.json_response({"success": True})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+async def api_calculate_delivery(request):
+    """Foydalanuvchi koordinatasi + tanlangan restoran ID'lar asosida narx hisoblash."""
+    if not is_authorized(request):
+        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    try:
+        from database import models
+        data = await request.json()
+        lat  = float(data.get('latitude', 0))
+        lon  = float(data.get('longitude', 0))
+        r_ids = [int(x) for x in data.get('restaurant_ids', [])]
+        result = await models.calculate_delivery_fee(lat, lon, r_ids)
+        return web.json_response(result)
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
 # WEB SERVER
 # ============================================================
 
@@ -1149,6 +1274,17 @@ async def start_web_server():
     app.router.add_get('/api/settings/loyalty', api_get_loyalty_settings)
     app.router.add_post('/api/settings/loyalty', api_update_loyalty_settings)
 
+    # Restaurants
+    app.router.add_get('/api/restaurants', api_get_restaurants)
+    app.router.add_post('/api/restaurants', api_create_restaurant)
+    app.router.add_put('/api/restaurants/{id}', api_update_restaurant)
+    app.router.add_delete('/api/restaurants/{id}', api_delete_restaurant)
+
+    # Delivery fee settings
+    app.router.add_get('/api/settings/delivery', api_get_delivery_settings)
+    app.router.add_post('/api/settings/delivery', api_save_delivery_settings)
+    app.router.add_post('/api/delivery/calculate', api_calculate_delivery)
+
     # --- Static Pages ---
     static_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
 
@@ -1202,12 +1338,14 @@ async def main():
         await start_web_server()
         try:
             await bot.set_my_description(
-                "🍊 Mandarin Supermarket botiga xush kelibsiz!\n\n"
-                "Bu bot orqali siz sarxil meva-chevalar, ichimliklar, oziq-ovqat va ro'zg'or mahsulotlariga uyingizdan turib qulay buyurtma berishingiz mumkin. Kuryerlarimiz mahsulotlarni tez va sifatli yetkazib beradi.\n"
-                "Buyurtma berish uchun botni ishga tushiring!"
+                "🍽️ Taomim – hamkor oshxonalardan qulay taom yetkazib berish!\n\n"
+                "Bu bot orqali sevimli oshxonalardan har xil taomlar buyurtma qiling. "
+                "Sho'rvalar, guruch taomlari, go'shtli taomlar, desertlar va boshqa ko'plab taomlar.\n"
+                "24/7 ishlaydi · Tez yetkazish · Narxi masofa bo'yicha.\n\n"
+                "Buyurtma berish uchun /start bosing!"
             )
             await bot.set_my_short_description(
-                "🍊 Mandarin Supermarket - oziq-ovqat va ro'zg'or mahsulotlarini uyingizga yetkazib berish boti"
+                "🍽️ Taomim – hamkor oshxonalardan tez va qulay taom yetkazib berish, 24/7"
             )
             logger.info("Bot ta'rifi (description) muvaffaqiyatli yangilandi.")
         except Exception as desc_err:

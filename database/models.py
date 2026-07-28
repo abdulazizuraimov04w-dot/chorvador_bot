@@ -98,14 +98,16 @@ async def create_tables():
 
     # Default sozlamalar
     default_settings = {
-        'reminder_hour':   '6',
-        'reminder_minute': '0',
-        'reminder_text':   "☀️ Xayrli tong!\n\nBugun nonushtaga nima buyurtma qilasiz? 🥛🧀🍞\nQuyidagi mahsulotlardan birini tanlab buyurtma berishingiz mumkin:",
-        'reminder_photo':  '',
-        'report_hour':     '6',
-        'report_minute':   '0',
-        'min_order_amount':'70000',
-        'loyalty_target':   '10',
+        'reminder_hour':        '6',
+        'reminder_minute':      '0',
+        'reminder_text':        "🍽️ Assalomu alaykum!\n\nBugun nima yemoqchi bo'lasiz?\nTaomim orqali qulay va tez buyurtma bering!",
+        'reminder_photo':       '',
+        'report_hour':          '6',
+        'report_minute':        '0',
+        'min_order_amount':     '0',
+        'loyalty_target':       '10',
+        'delivery_fee_per_km':  '2000',
+        'delivery_min_fee':     '3000',
     }
     for k, v in default_settings.items():
         await execute_query(
@@ -150,12 +152,41 @@ async def create_tables():
         );
     """)
 
-    # Migrations for users and orders
+    # 10. restaurants table (Taomim hamkor oshxonalar)
+    await execute_query("""
+        CREATE TABLE IF NOT EXISTS restaurants (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            phone VARCHAR(20),
+            address TEXT,
+            latitude DOUBLE PRECISION NOT NULL DEFAULT 41.2995,
+            longitude DOUBLE PRECISION NOT NULL DEFAULT 69.2401,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT NOW()
+        );
+    """)
+
+    # Migrations
     await execute_query("""
         ALTER TABLE users ADD COLUMN IF NOT EXISTS mfy_id INT REFERENCES mfy(id) ON DELETE SET NULL;
     """)
     await execute_query("""
         ALTER TABLE orders ADD COLUMN IF NOT EXISTS courier_id INT REFERENCES couriers(id) ON DELETE SET NULL;
+    """)
+    await execute_query("""
+        ALTER TABLE orders ADD COLUMN IF NOT EXISTS address_text TEXT;
+    """)
+    await execute_query("""
+        ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_fee NUMERIC(10,2) DEFAULT 0;
+    """)
+    await execute_query("""
+        ALTER TABLE orders ADD COLUMN IF NOT EXISTS distance_km NUMERIC(6,2) DEFAULT 0;
+    """)
+    await execute_query("""
+        ALTER TABLE orders ADD COLUMN IF NOT EXISTS restaurant_id INT REFERENCES restaurants(id) ON DELETE SET NULL;
+    """)
+    await execute_query("""
+        ALTER TABLE products ADD COLUMN IF NOT EXISTS restaurant_id INT REFERENCES restaurants(id) ON DELETE SET NULL;
     """)
 
     logger.info("Tables checked/created successfully.")
@@ -164,43 +195,28 @@ async def create_tables():
     categories_count = await fetch_val("SELECT COUNT(*) FROM categories;")
     if categories_count == 0:
         default_cats = [
-            ("Mevalar va Sabzavotlar", "🥭", 1),
-            ("Ichimliklar va Sharbatlar", "🥤", 2),
-            ("Sut va Tuxum mahsulotlari", "🧀", 3),
-            ("Non va Shirinliklar", "🍞", 4),
-            ("Go'sht va Kolbasa", "🥩", 5),
-            ("Maishiy Kimyo va Ro'zg'or", "🧼", 6),
+            ("Sho'rvalar",                   "🍲", 1),
+            ("Guruch taomlari",               "🍚", 2),
+            ("Xamirli taomlar",               "🥟", 3),
+            ("Quyma taomlar",                 "🍜", 4),
+            ("Go'shtli taomlar",              "🥩", 5),
+            ("Salatlar",                      "🥗", 6),
+            ("Desertlar",                     "🍰", 7),
+            ("Ichimliklar",                   "🥤", 8),
+            ("Tushlik seti",                  "🍱", 9),
         ]
         for c_name, c_icon, c_order in default_cats:
             await execute_query(
                 "INSERT INTO categories (name, icon, sort_order) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING;",
                 c_name, c_icon, c_order
             )
-        logger.info("Default supermarket categories inserted.")
-    
+        logger.info("Default Taomim food categories inserted.")
+
     # Insert default branch if empty
     branches_count = await fetch_val("SELECT COUNT(*) FROM branches;")
     if branches_count == 0:
         await execute_query("INSERT INTO branches (name) VALUES ('Asosiy filial');")
-        logger.info("Default branch 'Asosiy filial' inserted.")
-        
-    # Insert default products if empty
-    products_count = await fetch_val("SELECT COUNT(*) FROM products;")
-    if products_count == 0:
-        cat_id = await fetch_val("SELECT id FROM categories ORDER BY sort_order ASC LIMIT 1;")
-        default_products = [
-            ("Mandarin (1 kg)", Decimal("22000.00")),
-            ("Coca-Cola 1.5L", Decimal("14000.00")),
-            ("Shakar (1 kg)", Decimal("13000.00")),
-            ("Sariyog' 82.5% (200g)", Decimal("28000.00")),
-            ("Yopgan non", Decimal("4000.00"))
-        ]
-        for p_name, p_price in default_products:
-            await execute_query(
-                "INSERT INTO products (name, price, category_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING;",
-                p_name, p_price, cat_id
-            )
-        logger.info("Default supermarket products inserted.")
+        logger.info("Default branch inserted.")
 
 # --- USER METHODS ---
 
@@ -403,12 +419,12 @@ async def get_customer_detail(user_id: int) -> Optional[Dict[str, Any]]:
     return user
 
 async def get_min_order_amount() -> float:
-    """Minimal buyurtma summasini settings dan olish (default 70,000 so'm)."""
+    """Minimal buyurtma summasi (0 = chek yo'q)."""
     val = await fetch_val("SELECT value FROM settings WHERE key = 'min_order_amount';")
     try:
-        return float(val) if val else 70000.0
+        return float(val) if val else 0.0
     except (ValueError, TypeError):
-        return 70000.0
+        return 0.0
 
 async def get_loyalty_target() -> int:
     """Sovg'a marrasi (default 10 buyurtma)."""
@@ -417,6 +433,102 @@ async def get_loyalty_target() -> int:
         return int(val) if val else 10
     except (ValueError, TypeError):
         return 10
+
+# --- RESTAURANT METHODS ---
+import math
+
+def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Ikki koordinata orasidagi masofani km da hisoblaydi (Haversine formulasi)."""
+    R = 6371.0
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = (math.sin(dlat / 2) ** 2 +
+         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
+         math.sin(dlon / 2) ** 2)
+    return R * 2 * math.asin(math.sqrt(a))
+
+async def get_delivery_fee_settings() -> Dict[str, float]:
+    """Yetkazib berish tariflari sozlamalarini olish."""
+    rows = await fetch_rows("SELECT key, value FROM settings WHERE key IN ('delivery_fee_per_km', 'delivery_min_fee');")
+    result = {'delivery_fee_per_km': 2000.0, 'delivery_min_fee': 3000.0}
+    for r in rows:
+        try:
+            result[r['key']] = float(r['value'])
+        except (ValueError, TypeError):
+            pass
+    return result
+
+async def calculate_delivery_fee(user_lat: float, user_lon: float, restaurant_ids: List[int]) -> Dict[str, Any]:
+    """Eng uzoq oshxonaga qarab yetkazib berish narxini hisoblaydi."""
+    if not restaurant_ids:
+        return {'fee': 0, 'distance_km': 0, 'restaurant_id': None}
+
+    settings = await get_delivery_fee_settings()
+    fee_per_km = settings['delivery_fee_per_km']
+    min_fee    = settings['delivery_min_fee']
+
+    max_distance = 0.0
+    farthest_id  = restaurant_ids[0]
+
+    for r_id in restaurant_ids:
+        restaurant = await get_restaurant_by_id(r_id)
+        if not restaurant:
+            continue
+        dist = haversine_km(user_lat, user_lon, restaurant['latitude'], restaurant['longitude'])
+        if dist > max_distance:
+            max_distance = dist
+            farthest_id  = r_id
+
+    raw_fee = max(min_fee, max_distance * fee_per_km)
+    rounded_fee = round(raw_fee / 500) * 500  # 500 so'mga yaxlitlash
+
+    return {
+        'fee':           rounded_fee,
+        'distance_km':   round(max_distance, 2),
+        'restaurant_id': farthest_id
+    }
+
+async def get_all_restaurants() -> List[Dict[str, Any]]:
+    rows = await fetch_rows("""
+        SELECT r.*, 
+               COUNT(p.id) FILTER (WHERE p.is_active) AS active_products_count
+        FROM restaurants r
+        LEFT JOIN products p ON p.restaurant_id = r.id
+        GROUP BY r.id
+        ORDER BY r.name;
+    """)
+    return [dict(r) for r in rows]
+
+async def get_active_restaurants() -> List[Dict[str, Any]]:
+    rows = await fetch_rows("SELECT * FROM restaurants WHERE is_active = TRUE ORDER BY name;")
+    return [dict(r) for r in rows]
+
+async def get_restaurant_by_id(restaurant_id: int) -> Optional[Dict[str, Any]]:
+    row = await fetch_row("SELECT * FROM restaurants WHERE id = $1;", restaurant_id)
+    return dict(row) if row else None
+
+async def create_restaurant(name: str, phone: str, address: str,
+                            latitude: float, longitude: float) -> Dict[str, Any]:
+    row = await fetch_row("""
+        INSERT INTO restaurants (name, phone, address, latitude, longitude)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING *;
+    """, name, phone, address, latitude, longitude)
+    return dict(row)
+
+async def update_restaurant(restaurant_id: int, name: str, phone: str, address: str,
+                            latitude: float, longitude: float, is_active: bool) -> Optional[Dict[str, Any]]:
+    row = await fetch_row("""
+        UPDATE restaurants
+        SET name=$1, phone=$2, address=$3, latitude=$4, longitude=$5, is_active=$6
+        WHERE id=$7
+        RETURNING *;
+    """, name, phone, address, latitude, longitude, is_active, restaurant_id)
+    return dict(row) if row else None
+
+async def delete_restaurant(restaurant_id: int) -> bool:
+    await execute_query("DELETE FROM restaurants WHERE id = $1;", restaurant_id)
+    return True
 
 async def get_user_loyalty_info(telegram_id_or_user_id: int) -> Dict[str, Any]:
     """Mijozning 70k+ so'mlik buyurtmalari bo'yicha loyalty progress va visual bar matnini hisoblash."""
@@ -511,9 +623,11 @@ async def delete_category(category_id: int):
 
 async def get_active_products() -> List[Dict[str, Any]]:
     rows = await fetch_rows("""
-        SELECT p.*, c.name as category_name, c.icon as category_icon 
+        SELECT p.*, c.name as category_name, c.icon as category_icon,
+               r.name as restaurant_name
         FROM products p 
-        LEFT JOIN categories c ON p.category_id = c.id 
+        LEFT JOIN categories c ON p.category_id = c.id
+        LEFT JOIN restaurants r ON p.restaurant_id = r.id
         WHERE p.is_active = TRUE 
         ORDER BY c.sort_order ASC, p.name ASC;
     """)
@@ -521,9 +635,11 @@ async def get_active_products() -> List[Dict[str, Any]]:
 
 async def get_all_products() -> List[Dict[str, Any]]:
     rows = await fetch_rows("""
-        SELECT p.*, c.name as category_name, c.icon as category_icon 
+        SELECT p.*, c.name as category_name, c.icon as category_icon,
+               r.name as restaurant_name
         FROM products p 
-        LEFT JOIN categories c ON p.category_id = c.id 
+        LEFT JOIN categories c ON p.category_id = c.id
+        LEFT JOIN restaurants r ON p.restaurant_id = r.id
         ORDER BY p.name ASC;
     """)
     return [dict(r) for r in rows]
@@ -535,10 +651,11 @@ async def get_product_by_id(product_id: int) -> Optional[Dict[str, Any]]:
 async def update_product_price(product_id: int, new_price: Decimal):
     await execute_query("UPDATE products SET price = $1 WHERE id = $2;", new_price, product_id)
 
-async def add_product(name: str, price: Decimal, image_url: str = None, category_id: int = None) -> Dict[str, Any]:
+async def add_product(name: str, price: Decimal, image_url: str = None,
+                      category_id: int = None, restaurant_id: int = None) -> Dict[str, Any]:
     row = await fetch_row(
-        "INSERT INTO products (name, price, image_url, category_id) VALUES ($1, $2, $3, $4) RETURNING *;",
-        name, price, image_url, category_id
+        "INSERT INTO products (name, price, image_url, category_id, restaurant_id) VALUES ($1, $2, $3, $4, $5) RETURNING *;",
+        name, price, image_url, category_id, restaurant_id
     )
     return dict(row)
 
@@ -553,7 +670,8 @@ async def update_product_image(product_id: int, image_url: str) -> Optional[Dict
     return dict(row) if row else None
 
 async def update_product(product_id: int, name: str = None, price: Decimal = None,
-                         image_url: str = None, category_id: int = None) -> Optional[Dict[str, Any]]:
+                         image_url: str = None, category_id: int = None,
+                         restaurant_id: int = None) -> Optional[Dict[str, Any]]:
     fields = []
     values = []
     idx = 1
@@ -565,10 +683,12 @@ async def update_product(product_id: int, name: str = None, price: Decimal = Non
         fields.append(f"image_url = ${idx}"); values.append(image_url); idx += 1
     if category_id is not None:
         fields.append(f"category_id = ${idx}"); values.append(category_id); idx += 1
-    
+    if restaurant_id is not None:
+        fields.append(f"restaurant_id = ${idx}"); values.append(restaurant_id); idx += 1
+
     if not fields:
         return await get_product_by_id(product_id)
-        
+
     values.append(product_id)
     query = f"UPDATE products SET {', '.join(fields)} WHERE id = ${idx} RETURNING *;"
     row = await fetch_row(query, *values)

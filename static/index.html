@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mandarin Supermarket Panel</title>
+<title>Taomim Admin Panel</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -370,8 +370,8 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
 <div id="login-screen">
   <div class="login-card">
     <div class="login-logo">
-      <div class="icon">🍊</div>
-      <h2>Mandarin Supermarket</h2>
+      <div class="icon">🍽️</div>
+      <h2>Taomim</h2>
       <p>Admin boshqaruv tizimi</p>
     </div>
     <div class="form-group">
@@ -391,13 +391,14 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
   <!-- SIDEBAR -->
   <aside class="sidebar">
     <div class="logo">
-      <div class="logo-title"><div class="logo-icon">🍊</div><div><div>Mandarin</div><div class="logo-sub">Supermarket Admin</div></div></div>
+      <div class="logo-title"><div class="logo-icon">🍽️</div><div><div>Taomim</div><div class="logo-sub">Admin Panel</div></div></div>
     </div>
     <nav class="nav">
       <button class="nav-item active" onclick="navigate('dashboard',this)"><span class="icon">📊</span> Statistika</button>
       <button class="nav-item" onclick="navigate('orders',this)"><span class="icon">📦</span> Buyurtmalar <span class="nav-badge" id="pending-badge" style="display:none">0</span></button>
       <button class="nav-item" onclick="navigate('categories',this)"><span class="icon">🗂️</span> Kategoriyalar</button>
       <button class="nav-item" onclick="navigate('products',this)"><span class="icon">🛒</span> Mahsulotlar</button>
+      <button class="nav-item" onclick="navigate('restaurants',this)"><span class="icon">🏪</span> Oshxonalar</button>
       <button class="nav-item" onclick="navigate('customers',this)"><span class="icon">👥</span> Mijozlar</button>
       <button class="nav-item" onclick="navigate('broadcast',this)"><span class="icon">📢</span> Xabar yuborish</button>
       <button class="nav-item" onclick="navigate('payments',this)"><span class="icon">💰</span> To'lovlar</button>
@@ -405,6 +406,7 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
       <button class="nav-item" onclick="navigate('miniapp',this)"><span class="icon">📱</span> Mini App</button>
       <button class="nav-item" onclick="navigate('settings',this)"><span class="icon">⚙️</span> Eslatma sozlamalari</button>
       <button class="nav-item" onclick="navigate('logistics',this)"><span class="icon">🚚</span> Kuryerlar</button>
+      <button class="nav-item" onclick="navigate('delivery',this)"><span class="icon">💸</span> Yetkazish tariflari</button>
       <button class="nav-item" onclick="navigate('reminders',this)"><span class="icon">⏰</span> Eslatmalar</button>
     </nav>
     <div class="sidebar-footer">
@@ -814,7 +816,43 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
         </div>
       </div>
 
+      <!-- RESTAURANTS PAGE -->
+      <div class="page" id="page-restaurants">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <h3 style="font-size:16px;">🏪 Hamkor oshxonalar</h3>
+          <button class="action-btn primary" onclick="openAddRestaurant()">➕ Oshxona qo'shish</button>
+        </div>
+        <div id="restaurants-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
+          <div class="loader"><div class="spinner"></div> Yuklanmoqda...</div>
+        </div>
+      </div>
+
+      <!-- DELIVERY SETTINGS PAGE -->
+      <div class="page" id="page-delivery">
+        <div class="card" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;max-width:500px;">
+          <h3 style="font-size:16px;margin-bottom:18px;">💸 Yetkazib berish tariflari</h3>
+          <div class="form-group" style="margin-bottom:16px;">
+            <label class="form-label">1 km narxi (so'm)</label>
+            <input type="number" id="del-per-km" class="form-input" placeholder="Masalan: 2000" min="0" step="100">
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;">Eng uzoq oshxonagacha bo'lgan masofa uchun 1 km narxi</div>
+          </div>
+          <div class="form-group" style="margin-bottom:20px;">
+            <label class="form-label">Minimal yetkazib berish narxi (so'm)</label>
+            <input type="number" id="del-min-fee" class="form-input" placeholder="Masalan: 3000" min="0" step="500">
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;">Narx bu qiymatdan past bo'lmaydi</div>
+          </div>
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:20px;font-size:12px;color:var(--muted);">
+            <b style="color:var(--text);">📐 Hisoblash tartibi:</b><br>
+            Buyurtmadagi barcha oshxonalar ichida eng uzog'iga masofa (km) × 1 km narxi hisoblanadi.
+            Natija minimal narxdan kam bo'lsa, minimal narx qo'llaniladi.
+            Narx 500 so'mga yaxlitlanadi.
+          </div>
+          <button class="btn-save" onclick="saveDeliverySettings()">💾 Saqlash</button>
+        </div>
+      </div>
+
       <!-- REMINDERS PAGE -->
+
       <div class="page" id="page-reminders">
         <div class="card" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
@@ -855,7 +893,54 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
 </div>
 </div><!-- /app -->
 
+<!-- RESTAURANT MODAL -->
+<div class="modal-overlay" id="restaurant-modal">
+  <div class="modal" style="max-width:560px;">
+    <button class="modal-close" onclick="closeModal('restaurant-modal')">×</button>
+    <div class="modal-title" id="restaurant-modal-title">Yangi oshxona</div>
+    <div class="form-group" style="margin-bottom:12px;">
+      <label class="form-label">Oshxona nomi *</label>
+      <input type="text" id="rest-name" class="form-input" placeholder="Masalan: Oshxona Barakali">
+    </div>
+    <div class="form-group" style="margin-bottom:12px;">
+      <label class="form-label">Telefon raqami</label>
+      <input type="text" id="rest-phone" class="form-input" placeholder="+998 90 123 45 67">
+    </div>
+    <div class="form-group" style="margin-bottom:12px;">
+      <label class="form-label">Manzil (avtomatik to'ldiriladi)</label>
+      <input type="text" id="rest-address" class="form-input" placeholder="Xaritadan belgilang...">
+    </div>
+    <div class="form-group" style="margin-bottom:12px;">
+      <label class="form-label">📍 Xaritadan manzil tanlang</label>
+      <div id="restaurant-map-picker" style="height:280px;border-radius:8px;border:1px solid var(--border);"></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px;">Xaritaga bosib oshxona joylashuvini belgilang</div>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:12px;">
+      <div style="flex:1;">
+        <label class="form-label">Kenglik (lat)</label>
+        <input type="number" id="rest-lat" class="form-input" step="0.000001" value="41.2995">
+      </div>
+      <div style="flex:1;">
+        <label class="form-label">Uzunlik (lon)</label>
+        <input type="number" id="rest-lon" class="form-input" step="0.000001" value="69.2401">
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:16px;" id="rest-active-group">
+      <label class="form-label">Holati</label>
+      <select id="rest-active" class="form-input">
+        <option value="true">✅ Faol</option>
+        <option value="false">❌ Nofaol</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('restaurant-modal')">Bekor</button>
+      <button class="btn-save" onclick="saveRestaurant()">💾 Saqlash</button>
+    </div>
+  </div>
+</div>
+
 <!-- ORDER DETAIL MODAL -->
+
 <div class="modal-overlay" id="order-modal">
   <div class="modal">
     <button class="modal-close" onclick="closeModal('order-modal')">×</button>
@@ -924,6 +1009,12 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
           <input type="text" class="form-input" id="prod-image-url" placeholder="Yoki rasm URL manzili..." style="margin-top:6px;font-size:11px;" oninput="updateImagePreview(this.value, document.getElementById('prod-name').value)">
         </div>
       </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Qaysi oshxona</label>
+      <select class="form-input" id="prod-restaurant">
+        <option value="">-- Oshxona tanlanmagan --</option>
+      </select>
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('product-modal')">Bekor</button>
@@ -1093,6 +1184,7 @@ function initApp() {
   setInterval(() => { loadOrders(false); }, 60000);
   loadCouriersListGlobally();
   loadCategoriesListGlobally();
+  loadRestaurantsListGlobally();
 }
 
 function updateClock() {
@@ -1108,7 +1200,22 @@ function navigate(page, btn) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   if (btn) btn.classList.add('active');
   document.getElementById('page-' + page).classList.add('active');
-  const titles = { dashboard:'Statistika', orders:'Buyurtmalar', categories:'🗂️ Kategoriyalar boshqaruvi', products:'Mahsulotlar', customers:'Mijozlar', broadcast:'Xabar yuborish', payments:'To\'lovlar', map:'🗺️ Yetkazish xaritasi', miniapp:'📱 Mini App', settings:'⏰ Eslatma sozlamalari', logistics:'🚚 Kuryerlar boshqaruvi' };
+  const titles = {
+    dashboard: 'Statistika',
+    orders: 'Buyurtmalar',
+    categories: '🗂️ Kategoriyalar',
+    products: 'Mahsulotlar',
+    restaurants: '🏪 Hamkor oshxonalar',
+    customers: 'Mijozlar',
+    broadcast: 'Xabar yuborish',
+    payments: 'To\'lovlar',
+    map: '🗺️ Yetkazish xaritasi',
+    miniapp: '📱 Mini App',
+    settings: '⏰ Eslatma sozlamalari',
+    logistics: '🚚 Kuryerlar boshqaruvi',
+    delivery: '💸 Yetkazish tariflari',
+    reminders: '⏰ Avtomatik eslatmalar'
+  };
   document.getElementById('page-title').textContent = titles[page] || page;
   if (page === 'orders') loadOrders();
   if (page === 'categories') loadCategoriesPage();
@@ -1120,6 +1227,8 @@ function navigate(page, btn) {
   if (page === 'miniapp') loadMiniappEditor();
   if (page === 'settings') loadSettingsPage();
   if (page === 'logistics') loadCouriers();
+  if (page === 'restaurants') loadRestaurantsPage();
+  if (page === 'delivery') loadDeliverySettings();
 }
 
 // ==================== DASHBOARD ====================
@@ -1553,6 +1662,8 @@ function renderProducts() {
       <div class="product-card">
         ${imgHtml}
         <div class="product-name">${esc(p.name)}</div>
+        ${p.restaurant_name ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">🏪 ${esc(p.restaurant_name)}</div>` : ''}
+        ${p.category_name ? `<div style="font-size:11px;color:var(--muted);">${p.category_icon||''} ${esc(p.category_name)}</div>` : ''}
         <div class="product-price">${fmtMoney(p.price)} <small>so'm</small></div>
         <div class="product-status" style="margin-top:10px;display:flex;align-items:center;gap:6px;">
           <label class="toggle-switch">
@@ -1618,10 +1729,12 @@ async function uploadProductImage(input) {
 function openAddProduct() {
   editingProductId = null;
   populateProductCategorySelect();
-  document.getElementById('product-modal-title').textContent = 'Yangi mahsulot';
+  populateProductRestaurantSelect();
+  document.getElementById('product-modal-title').textContent = 'Yangi taom';
   document.getElementById('prod-name').value = '';
   document.getElementById('prod-price').value = '';
   document.getElementById('prod-category').value = '';
+  document.getElementById('prod-restaurant').value = '';
   document.getElementById('prod-image-url').value = '';
   document.getElementById('prod-file-input').value = '';
   updateImagePreview('');
@@ -1633,10 +1746,12 @@ function openEditProduct(id) {
   const p = allProducts.find(x => x.id === id);
   if (!p) return;
   populateProductCategorySelect();
-  document.getElementById('product-modal-title').textContent = 'Mahsulotni tahrirlash';
+  populateProductRestaurantSelect();
+  document.getElementById('product-modal-title').textContent = 'Taomni tahrirlash';
   document.getElementById('prod-name').value = p.name;
   document.getElementById('prod-price').value = p.price;
   document.getElementById('prod-category').value = p.category_id || '';
+  document.getElementById('prod-restaurant').value = p.restaurant_id || '';
   document.getElementById('prod-image-url').value = p.image_url || '';
   document.getElementById('prod-file-input').value = '';
   updateImagePreview(p.image_url || '', p.name);
@@ -1647,18 +1762,20 @@ async function saveProduct() {
   const name = document.getElementById('prod-name').value.trim();
   const price = parseFloat(document.getElementById('prod-price').value);
   const categoryIdVal = document.getElementById('prod-category').value;
+  const restaurantIdVal = document.getElementById('prod-restaurant').value;
   const image_url = document.getElementById('prod-image-url').value.trim() || null;
   const category_id = categoryIdVal ? parseInt(categoryIdVal) : null;
+  const restaurant_id = restaurantIdVal ? parseInt(restaurantIdVal) : null;
 
   if (!name || isNaN(price) || price <= 0) { showToast('Iltimos, barcha maydonlarni to\'ldiring', 'error'); return; }
   let r;
   if (editingProductId) {
-    r = await api(`/api/products/${editingProductId}`, 'PUT', { name, price, image_url, category_id });
+    r = await api(`/api/products/${editingProductId}`, 'PUT', { name, price, image_url, category_id, restaurant_id });
   } else {
-    r = await api('/api/products', 'POST', { name, price, image_url, category_id });
+    r = await api('/api/products', 'POST', { name, price, image_url, category_id, restaurant_id });
   }
   if (r?.success || r?.id || r?.product) {
-    showToast(editingProductId ? 'Mahsulot yangilandi!' : 'Mahsulot qo\'shildi!', 'success');
+    showToast(editingProductId ? 'Taom yangilandi!' : 'Taom qo\'shildi!', 'success');
     closeModal('product-modal');
     loadProducts();
   } else { showToast(r?.error || 'Xatolik', 'error'); }
@@ -2755,7 +2872,185 @@ async function assignCourier(orderId, courierId) {
   }
 }
 
+// ==================== RESTAURANTS ====================
+let allRestaurantsList = [];
+let editingRestaurantId = null;
+let restaurantMapPicker = null;
+let restaurantMapMarker = null;
+
+async function loadRestaurantsListGlobally() {
+  const data = await api('/api/restaurants');
+  if (data && Array.isArray(data)) {
+    allRestaurantsList = data;
+    populateProductRestaurantSelect();
+  }
+}
+
+function populateProductRestaurantSelect() {
+  const sel = document.getElementById('prod-restaurant');
+  if (!sel) return;
+  const val = sel.value;
+  sel.innerHTML = '<option value="">-- Oshxona tanlanmagan --</option>' +
+    allRestaurantsList.filter(r => r.is_active).map(r =>
+      `<option value="${r.id}">${esc(r.name)}</option>`
+    ).join('');
+  if (val) sel.value = val;
+}
+
+async function loadRestaurantsPage() {
+  const g = document.getElementById('restaurants-grid');
+  g.innerHTML = '<div class="loader"><div class="spinner"></div> Yuklanmoqda...</div>';
+  const data = await api('/api/restaurants');
+  if (!data) return;
+  allRestaurantsList = Array.isArray(data) ? data : [];
+  populateProductRestaurantSelect();
+  if (!allRestaurantsList.length) {
+    g.innerHTML = '<div class="empty-state"><div class="emoji">🏪</div><p>Hali oshxona qo\'shilmagan</p></div>';
+    return;
+  }
+  g.innerHTML = allRestaurantsList.map(r => `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;position:relative;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+        <div>
+          <div style="font-weight:700;font-size:15px;">${esc(r.name)}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">${r.phone ? esc(r.phone) : '—'}</div>
+        </div>
+        <span style="font-size:11px;padding:3px 8px;border-radius:20px;background:${r.is_active ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.1)'};color:${r.is_active ? 'var(--green)' : 'var(--red)'};">
+          ${r.is_active ? '✅ Faol' : '❌ Nofaol'}
+        </span>
+      </div>
+      ${r.address ? `<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">📍 ${esc(r.address)}</div>` : ''}
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">
+        🍽️ ${r.active_products_count || 0} ta faol taom &nbsp;|&nbsp;
+        🌐 ${r.latitude?.toFixed(4)}, ${r.longitude?.toFixed(4)}
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button class="action-btn primary" style="flex:1;" onclick="openEditRestaurant(${r.id})">✏️ Tahrirlash</button>
+        <button class="action-btn" style="flex:1;background:rgba(239,68,68,0.1);color:var(--red);border-color:rgba(239,68,68,0.3);" onclick="deleteRestaurant(${r.id})">🗑️ O'chirish</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function initRestaurantMapPicker(lat, lon) {
+  if (restaurantMapPicker) {
+    restaurantMapPicker.remove();
+    restaurantMapPicker = null;
+    restaurantMapMarker = null;
+  }
+  restaurantMapPicker = L.map('restaurant-map-picker').setView([lat, lon], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(restaurantMapPicker);
+
+  restaurantMapMarker = L.marker([lat, lon], { draggable: true }).addTo(restaurantMapPicker);
+  restaurantMapMarker.on('dragend', e => updateRestaurantCoords(e.target.getLatLng()));
+
+  restaurantMapPicker.on('click', e => {
+    restaurantMapMarker.setLatLng(e.latlng);
+    updateRestaurantCoords(e.latlng);
+  });
+}
+
+function updateRestaurantCoords(latlng) {
+  document.getElementById('rest-lat').value = latlng.lat.toFixed(6);
+  document.getElementById('rest-lon').value = latlng.lng.toFixed(6);
+  // Reverse geocode with Nominatim
+  fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latlng.lat}&lon=${latlng.lng}&format=json`)
+    .then(r => r.json())
+    .then(d => {
+      if (d && d.display_name) {
+        document.getElementById('rest-address').value = d.display_name;
+      }
+    }).catch(() => {});
+}
+
+function openAddRestaurant() {
+  editingRestaurantId = null;
+  document.getElementById('restaurant-modal-title').textContent = 'Yangi oshxona qo\'shish';
+  document.getElementById('rest-name').value = '';
+  document.getElementById('rest-phone').value = '';
+  document.getElementById('rest-address').value = '';
+  document.getElementById('rest-lat').value = '41.2995';
+  document.getElementById('rest-lon').value = '69.2401';
+  document.getElementById('rest-active').value = 'true';
+  document.getElementById('restaurant-modal').classList.add('open');
+  setTimeout(() => initRestaurantMapPicker(41.2995, 69.2401), 100);
+}
+
+function openEditRestaurant(id) {
+  const r = allRestaurantsList.find(x => x.id === id);
+  if (!r) return;
+  editingRestaurantId = id;
+  document.getElementById('restaurant-modal-title').textContent = 'Oshxonani tahrirlash';
+  document.getElementById('rest-name').value = r.name;
+  document.getElementById('rest-phone').value = r.phone || '';
+  document.getElementById('rest-address').value = r.address || '';
+  document.getElementById('rest-lat').value = r.latitude;
+  document.getElementById('rest-lon').value = r.longitude;
+  document.getElementById('rest-active').value = r.is_active ? 'true' : 'false';
+  document.getElementById('restaurant-modal').classList.add('open');
+  setTimeout(() => initRestaurantMapPicker(r.latitude, r.longitude), 100);
+}
+
+async function saveRestaurant() {
+  const name = document.getElementById('rest-name').value.trim();
+  const phone = document.getElementById('rest-phone').value.trim();
+  const address = document.getElementById('rest-address').value.trim();
+  const latitude = parseFloat(document.getElementById('rest-lat').value);
+  const longitude = parseFloat(document.getElementById('rest-lon').value);
+  const is_active = document.getElementById('rest-active').value === 'true';
+  if (!name) { showToast('Oshxona nomini kiriting!', 'error'); return; }
+  const payload = { name, phone, address, latitude, longitude, is_active };
+  let r;
+  if (editingRestaurantId) {
+    r = await api(`/api/restaurants/${editingRestaurantId}`, 'PUT', payload);
+  } else {
+    r = await api('/api/restaurants', 'POST', payload);
+  }
+  if (r && (r.id || r.name)) {
+    showToast(editingRestaurantId ? 'Oshxona yangilandi!' : 'Oshxona qo\'shildi!', 'success');
+    closeModal('restaurant-modal');
+    loadRestaurantsPage();
+    loadRestaurantsListGlobally();
+  } else {
+    showToast(r?.error || 'Xatolik yuz berdi', 'error');
+  }
+}
+
+async function deleteRestaurant(id) {
+  if (!confirm('Haqiqatan ham bu oshxonani o\'chirib tashlamoqchimisiz? Unga bog\'liq taomlar ham o\'chishi mumkin!')) return;
+  const r = await api(`/api/restaurants/${id}`, 'DELETE');
+  if (r && r.success) {
+    showToast('Oshxona o\'chirildi!', 'success');
+    loadRestaurantsPage();
+    loadRestaurantsListGlobally();
+  } else {
+    showToast(r?.error || 'Xatolik', 'error');
+  }
+}
+
+// ==================== DELIVERY SETTINGS ====================
+async function loadDeliverySettings() {
+  const data = await api('/api/settings/delivery');
+  if (!data) return;
+  document.getElementById('del-per-km').value = data.delivery_fee_per_km || 2000;
+  document.getElementById('del-min-fee').value = data.delivery_min_fee || 3000;
+}
+
+async function saveDeliverySettings() {
+  const delivery_fee_per_km = parseFloat(document.getElementById('del-per-km').value);
+  const delivery_min_fee = parseFloat(document.getElementById('del-min-fee').value);
+  if (isNaN(delivery_fee_per_km) || isNaN(delivery_min_fee)) {
+    showToast('Narxlarni to\'g\'ri kiriting!', 'error'); return;
+  }
+  const r = await api('/api/settings/delivery', 'POST', { delivery_fee_per_km, delivery_min_fee });
+  if (r && r.success) showToast('Yetkazish tariflari saqlandi!', 'success');
+  else showToast(r?.error || 'Xatolik', 'error');
+}
+
 // ==================== AUTO LOGIN (if token saved) ====================
+
 window.addEventListener('DOMContentLoaded', () => {
   const saved = savedToken();
   if (saved) {
