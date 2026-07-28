@@ -191,26 +191,36 @@ async def create_tables():
 
     logger.info("Tables checked/created successfully.")
 
-    # Insert default categories if empty
-    categories_count = await fetch_val("SELECT COUNT(*) FROM categories;")
-    if categories_count == 0:
-        default_cats = [
-            ("Sho'rvalar",                   "🍲", 1),
-            ("Guruch taomlari",               "🍚", 2),
-            ("Xamirli taomlar",               "🥟", 3),
-            ("Quyma taomlar",                 "🍜", 4),
-            ("Go'shtli taomlar",              "🥩", 5),
-            ("Salatlar",                      "🥗", 6),
-            ("Desertlar",                     "🍰", 7),
-            ("Ichimliklar",                   "🥤", 8),
-            ("Tushlik seti",                  "🍱", 9),
-        ]
-        for c_name, c_icon, c_order in default_cats:
-            await execute_query(
-                "INSERT INTO categories (name, icon, sort_order) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING;",
-                c_name, c_icon, c_order
-            )
-        logger.info("Default Taomim food categories inserted.")
+    # Always upsert Taomim food categories (migration to food delivery)
+    taomim_cats = [
+        ("Sho'rvalar",       "🍲", 1),
+        ("Guruch taomlari",  "🍚", 2),
+        ("Xamirli taomlar",  "🥟", 3),
+        ("Quyma taomlar",    "🍜", 4),
+        ("Go'shtli taomlar", "🥩", 5),
+        ("Salatlar",         "🥗", 6),
+        ("Desertlar",        "🍰", 7),
+        ("Ichimliklar",      "🥤", 8),
+        ("Tushlik seti",     "🍱", 9),
+    ]
+    for c_name, c_icon, c_order in taomim_cats:
+        await execute_query(
+            """INSERT INTO categories (name, icon, sort_order)
+               VALUES ($1, $2, $3)
+               ON CONFLICT (name) DO UPDATE SET icon=EXCLUDED.icon, sort_order=EXCLUDED.sort_order;""",
+            c_name, c_icon, c_order
+        )
+    # Delete old supermarket categories that don't belong to food delivery
+    old_cats = ["Sut mahsulotlari", "Mevalar", "Sabzavotlar", "Non mahsulotlari",
+                "Ichimliklar va sharbatlar", "Oziq-ovqat", "Uy jihozlari",
+                "Go'sht va baliq", "Shirinliklar"]
+    for old in old_cats:
+        await execute_query(
+            "DELETE FROM categories WHERE name=$1 AND id NOT IN (SELECT DISTINCT category_id FROM products WHERE category_id IS NOT NULL);",
+            old
+        )
+    logger.info("Taomim food categories upserted.")
+
 
     # Insert default branch if empty
     branches_count = await fetch_val("SELECT COUNT(*) FROM branches;")

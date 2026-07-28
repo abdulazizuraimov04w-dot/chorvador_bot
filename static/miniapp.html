@@ -284,31 +284,12 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
       🛒 Savat <span class="cart-count" id="cart-count-top">0</span>
     </button>
   </div>
-  <div class="catalog-header" style="padding-bottom:6px;">
-    <h2>Hamkor oshxonalar</h2>
-    <p>🕒 24/7 · Tez yetkazish · Masofa bo'yicha narx</p>
-  </div>
 
   <!-- SEARCH BAR -->
-  <div style="padding:0 16px 10px;">
+  <div style="padding:10px 16px 6px;">
     <div style="position:relative;display:flex;align-items:center;">
       <span style="position:absolute;left:12px;font-size:15px;color:var(--muted)">🔍</span>
-      <input type="text" id="miniapp-search" placeholder="Mahsulotlarni qidirish..." oninput="onSearchInput(this.value)" style="width:100%;padding:9px 12px 9px 36px;border-radius:12px;border:1px solid var(--border);background:var(--surface);font-size:14px;outline:none;">
-    </div>
-  </div>
-
-  <!-- LOYALTY CARD -->
-  <div class="loyalty-banner-card" id="miniapp-loyalty-card" style="display:none">
-    <div class="loyalty-head">
-      <span class="loyalty-title">🎁 10-Yubiley Sovg'asi</span>
-      <span class="loyalty-badge" id="loyalty-badge-text">0 / 10 buyurtma</span>
-    </div>
-    <div class="loyalty-track">
-      <div class="loyalty-fill" id="loyalty-fill-bar" style="width:0%"></div>
-    </div>
-    <div class="loyalty-sub">
-      <span id="loyalty-sub-text">Sovg'agacha 10 ta buyurtma qoldi</span>
-      <span style="font-size:10px;opacity:0.85">🍽️ Taomim</span>
+      <input type="text" id="miniapp-search" placeholder="Taomlarni qidirish..." oninput="onSearchInput(this.value)" style="width:100%;padding:9px 12px 9px 36px;border-radius:12px;border:1px solid var(--border);background:var(--surface);font-size:14px;outline:none;">
     </div>
   </div>
 
@@ -787,15 +768,25 @@ function renderOrderForm() {
   
   updateTimeButtons(currentHour);
 
-  const items=getCartItems(), total=items.reduce((s,i)=>s+i.subtotal,0);
-  document.getElementById('order-preview').innerHTML = `
-    ${items.map(i=>`<div class="order-preview-row"><span>${getEmoji(i.name)} ${esc(i.name)} × ${i.quantity}</span><span>${fmtPrice(i.subtotal)} so'm</span></div>`).join('')}
-    <div class="order-preview-total"><span>Jami to'lov</span><span class="val">${fmtPrice(total)} so'm</span></div>`;
-  if(userLocation){
+  const items = getCartItems();
+  const total = items.reduce((s,i) => s+i.subtotal, 0);
+  const grandTotal = total + (deliveryFeeAmount || 0);
+  document.getElementById('order-preview').innerHTML = items.length
+    ? items.map(i => `
+        <div class="order-preview-row">
+          <span>${getEmoji(i)} ${esc(i.name)} × ${i.quantity} dona</span>
+          <span>${fmtPrice(i.subtotal)} so'm</span>
+        </div>`).join('') +
+      `<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--muted);padding:4px 0">
+        <span>🚴 Yetkazish</span><span>${deliveryFeeAmount > 0 ? fmtPrice(deliveryFeeAmount)+" so'm" : 'Hisoblanmoqda...'}</span>
+       </div>
+       <div class="order-preview-total"><span>Jami to'lov</span><span class="val">${fmtPrice(grandTotal)} so'm</span></div>`
+    : '<div style="color:var(--muted);font-size:13px;">Savat bo\'sh</div>';
+  if (userLocation) {
     document.getElementById('location-name').textContent  = 'Yangi manzil tanlandi';
     document.getElementById('location-coords').textContent = `${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}`;
   }
-  document.getElementById('confirm-btn').textContent = `✅ Tasdiqlash — ${fmtPrice(total)} so'm`;
+  document.getElementById('confirm-btn').textContent = `✅ Tasdiqlash — ${fmtPrice(grandTotal)} so'm`;
 }
 
 function updateTimeButtons(currentHour) {
