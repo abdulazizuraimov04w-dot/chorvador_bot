@@ -1339,14 +1339,13 @@ async def main():
         try:
             await bot.set_my_description(
                 "🍽️ Taomim — tez va mazali taom yetkazib berish xizmati!\n\n"
-                "Bu bot orqali eng sevimli taomlaringizni buyurtma qiling. "
-                "Sho'rvalar, guruch taomlari, go'shtli taomlar, desertlar va boshqa ko'plab taomlar.\n\n"
-                "⏱️ 24/7 ishlaydi\n"
+                "Bu bot orqali eng sevimli taomlaringizni buyurtma qiling.\n\n"
+                "⏱️ Ish vaqti 09:00 - 23:00\n"
                 "🚴 Tez yetkazish\n\n"
                 "Buyurtma berish uchun /start bosing!"
             )
             await bot.set_my_short_description(
-                "🍽️ Taomim — tez va mazali taom yetkazib berish, 24/7"
+                "🍽️ Taomim — tez va mazali taom yetkazib berish xizmati, 09:00–23:00"
             )
             logger.info("Bot ta'rifi (description) muvaffaqiyatli yangilandi.")
         except Exception as desc_err:

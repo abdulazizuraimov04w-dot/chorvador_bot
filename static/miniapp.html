@@ -428,9 +428,9 @@ let userLocation = null;
 let currentPage  = 'catalog';
 
 const TIME_MAP = {
-  morning: { start:'06:00', end:'07:00' },
-  noon:    { start:'12:00', end:'13:00' },
-  evening: { start:'18:00', end:'19:00' }
+  morning: { start:'09:00', end:'12:00', label:'Ertalab 09:00–12:00' },
+  noon:    { start:'12:00', end:'17:00', label:'Kunduz 12:00–17:00'  },
+  evening: { start:'17:00', end:'23:00', label:'Kechqurun 17:00–23:00' }
 };
 
 // ============================================================
@@ -753,14 +753,17 @@ function renderOrderForm() {
   const currentHour = now.getHours();
   const dayTodayBtn = document.getElementById('day-today');
   
-  // Agar soat 18:00 dan o'tgan bo'lsa, Bugun uchun barcha slotlar tugagan - Bugun bloklanadi
-  if (currentHour >= 18) {
+  // Agar soat 23:00 dan o'tgan bo'lsa, Bugun uchun barcha slotlar tugagan
+  if (currentHour >= 23) {
     dayTodayBtn.disabled = true;
     if (selectedDay === 'today') {
       selectedDay = 'tomorrow';
       document.getElementById('day-today').classList.remove('selected');
       document.getElementById('day-tomorrow').classList.add('selected');
     }
+  } else if (currentHour < 9) {
+    // Hali ochilmagan
+    dayTodayBtn.disabled = false;
   } else {
     dayTodayBtn.disabled = false;
   }
@@ -790,24 +793,23 @@ function renderOrderForm() {
 
 function updateTimeButtons(currentHour) {
   const timeMorningBtn = document.getElementById('time-morning');
-  const timeNoonBtn = document.getElementById('time-noon');
+  const timeNoonBtn    = document.getElementById('time-noon');
   const timeEveningBtn = document.getElementById('time-evening');
   
   if (selectedDay === 'today') {
-    // Bugun uchun cheklovlar
-    timeMorningBtn.disabled = currentHour >= 8;
-    timeNoonBtn.disabled = currentHour >= 12;
-    timeEveningBtn.disabled = currentHour >= 18;
+    // Bugun uchun cheklovlar: soat o'tgan slotlarni bloklash
+    timeMorningBtn.disabled = currentHour >= 12; // Ertalab 09-12
+    timeNoonBtn.disabled    = currentHour >= 17; // Kunduz 12-17
+    timeEveningBtn.disabled = currentHour >= 23; // Kechqurun 17-23
     
-    // Agar faol tanlangan slot bloklangan bo'lsa, ochiq bo'lgan birinchi slotga o'tkaziladi
+    // Agar faol tanlangan slot bloklangan bo'lsa, keyingisiga o'tkazish
     if (selectedTime === 'morning' && timeMorningBtn.disabled) {
-      if (!timeNoonBtn.disabled) {
-        selectTime('noon');
-      } else if (!timeEveningBtn.disabled) {
-        selectTime('evening');
-      }
+      if (!timeNoonBtn.disabled)    { selectTime('noon');    }
+      else if (!timeEveningBtn.disabled) { selectTime('evening'); }
     }
     if (selectedTime === 'noon' && timeNoonBtn.disabled) {
+      if (!timeEveningBtn.disabled) { selectTime('evening'); }
+    }
       if (!timeEveningBtn.disabled) {
         selectTime('evening');
       }
@@ -884,7 +886,7 @@ async function confirmOrder() {
   btn.disabled = false;
   if (result?.success) {
     const dayLabel = selectedDay === 'today' ? 'Bugun' : 'Ertaga';
-    const timeLabel = { morning:'Ertalab 06:00–07:00', noon:'Kunduz 12:00–13:00', evening:'Kechqurun 18:00–19:00' }[selectedTime];
+    const timeLabel = TIME_MAP[selectedTime]?.label || selectedTime;
     const grandTotal = total + (deliveryFeeAmount || 0);
     document.getElementById('success-detail').innerHTML = `
       📅 <b>${dayLabel}</b>, ${timeLabel}<br>
