@@ -39,7 +39,7 @@ async def cmd_start(message: Message, state: FSMContext):
         logger.info(f"User {telegram_id} ({user['full_name']}) started the bot. Already registered.")
         # Send main menu reply keyboard first so the customer has it permanently
         await message.answer(
-            "🍽️ Taomim — hamkor oshxonalardan tez va mazali taomlar! 🚀",
+            "🍽️ Taomim — tez va mazali taom yetkazib berish xizmati!",
             reply_markup=keyboards.get_main_menu_keyboard(is_admin=is_admin)
         )
         
@@ -53,16 +53,15 @@ async def cmd_start(message: Message, state: FSMContext):
         # Then send greeting message with the inline button
         await message.answer(
             f"Assalomu alaykum, {user['full_name']}! 👋\n\n"
-            "🍽️ Taomim orqali hamkor oshxonalardan qulay buyurtma bering.\n"
-            "Pastdagi tugmani bosing:",
+            "Buyurtma berish uchun pastdagi tugmani bosing:",
             reply_markup=inline_keyboard
         )
         return
 
     logger.info(f"New user {telegram_id} started the bot. Initiating registration.")
     await message.answer(
-        "Assalomu alaykum! 🍽️ **Taomim** — hamkor oshxonalardan qulay va tez taom yetkazib berish xizmatiga xush kelibsiz!\n\n"
-        "24/7 ishlaydi · Masofa bo'yicha narx · Ko'plab oshxonalar\n\n"
+        "Assalomu alaykum! 🍽️ **Taomim** — tez va mazali taom yetkazib berish xizmatiga xush kelibsiz!\n\n"
+        "⏱️ 24/7 ishlaydi  ·  🚴 Tez yetkazish\n\n"
         "Xizmatdan foydalanish uchun ro'yxatdan o'tishingiz lozim.\n"
         "Iltimos, **ism va familiyangizni** kiriting (masalan: Alisher Usmonov):",
         parse_mode="Markdown",
@@ -148,7 +147,7 @@ async def process_location(message: Message, state: FSMContext):
         )
         
         await message.answer(
-            "🍽️ Taomim — hamkor oshxonalardan tez va mazali taomlar! 🚀",
+            "🍽️ Taomim — tez va mazali taom yetkazib berish xizmati!",
             reply_markup=keyboards.get_main_menu_keyboard(is_admin=is_admin)
         )
         
@@ -161,7 +160,7 @@ async def process_location(message: Message, state: FSMContext):
         await message.answer(
             f"🎉 Xush kelibsiz, {full_name}!\n\n"
             "✅ Ro'yxatdan o'tish muvaffaqiyatli yakunlandi!\n\n"
-            "🍽️ Taomim orqali hamkor oshxonalardan qulay buyurtma bering:\n"
+            "🍽️ Taomim orqali qulay buyurtma bering:\n"
             "  • Ko'plab taom turlari\n"
             "  • Tez yetkazish\n"
             "  • 24/7 ishlaydi\n\n"
