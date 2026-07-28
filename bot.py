@@ -1183,18 +1183,51 @@ async def api_save_delivery_settings(request):
         return web.json_response({"error": str(e)}, status=500)
 
 async def api_calculate_delivery(request):
-    """Foydalanuvchi koordinatasi + tanlangan restoran ID'lar asosida narx hisoblash."""
-    if not is_authorized(request):
-        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
+    """telegram_id + product_ids asosida yetkazib berish narxini hisoblaydi."""
     try:
         from database import models
         data = await request.json()
-        lat  = float(data.get('latitude', 0))
-        lon  = float(data.get('longitude', 0))
-        r_ids = [int(x) for x in data.get('restaurant_ids', [])]
-        result = await models.calculate_delivery_fee(lat, lon, r_ids)
-        return web.json_response(result)
+        telegram_id = data.get('telegram_id')
+        product_ids = data.get('product_ids', [])
+
+        if not telegram_id:
+            return web.json_response({"error": "telegram_id kerak"}, status=400)
+
+        # 1. Foydalanuvchi koordinatasini bazadan olish
+        user = await models.get_user_by_telegram_id(int(telegram_id))
+        if not user:
+            return web.json_response({"error": "Foydalanuvchi topilmadi"}, status=404)
+
+        user_lat = user.get('latitude')
+        user_lon = user.get('longitude')
+        if not user_lat or not user_lon:
+            return web.json_response({"error": "Manzil saqlanmagan"}, status=400)
+
+        # 2. product_ids dan restaurant_id larni olish
+        r_ids = set()
+        for pid in product_ids:
+            try:
+                prod = await models.get_product_by_id(int(pid))
+                if prod and prod.get('restaurant_id'):
+                    r_ids.add(prod['restaurant_id'])
+            except Exception:
+                pass
+
+        if not r_ids:
+            # restaurant_id bog'lanmagan bo'lsa barcha faol oshxonalarni olish
+            restaurants = await models.get_active_restaurants()
+            r_ids = {r['id'] for r in restaurants}
+
+        # 3. Delivery fee hisoblash
+        result = await models.calculate_delivery_fee(user_lat, user_lon, list(r_ids))
+
+        return web.json_response({
+            "delivery_fee": result.get('fee', 0),
+            "distance_km":  result.get('distance_km', 0),
+            "restaurant_id": result.get('restaurant_id')
+        })
     except Exception as e:
+        logger.error(f"api_calculate_delivery: {e}")
         return web.json_response({"error": str(e)}, status=500)
 
 # WEB SERVER
