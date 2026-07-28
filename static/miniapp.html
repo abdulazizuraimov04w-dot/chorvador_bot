@@ -268,8 +268,11 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 <!-- ============================================================
      SPLASH SCREEN
      ============================================================ -->
-<div id="splash">
-  <div id="splash-logo" style="font-size:80px;line-height:1;animation:splashPop 0.5s cubic-bezier(0.34,1.56,0.64,1) both;">🍽️</div>
+<div id="splash" style="background:#fff;">
+  <img src="/static/taomim_splash.png"
+       style="width:260px;height:260px;object-fit:contain;
+              animation:splashPop 0.5s cubic-bezier(0.34,1.56,0.64,1) both;"
+       alt="Taomim">
   <div id="splash-tagline">Taomim — mazali taomlar</div>
   <div id="splash-dots">
     <span></span><span></span><span></span>
@@ -329,17 +332,6 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
     <div></div>
   </div>
   <div class="order-form">
-    <div class="form-section">
-      <div class="form-section-title">📅 Yetkazish kuni</div>
-      <div class="option-grid">
-        <button class="option-btn selected" id="day-today" onclick="selectDay('today')">
-          📅 Bugun<br><small id="today-label" style="font-weight:400;color:var(--muted)"></small>
-        </button>
-        <button class="option-btn" id="day-tomorrow" onclick="selectDay('tomorrow')">
-          📅 Ertaga<br><small id="tomorrow-label" style="font-weight:400;color:var(--muted)"></small>
-        </button>
-      </div>
-    </div>
     <div class="form-section">
       <div class="form-section-title">📍 Yetkazish manzili</div>
       <div class="location-box">
@@ -510,8 +502,8 @@ function renderLoyaltyCard() {
 }
 
 async function loadProducts() {
-  // Safety timeout to ensure splash screen hides even on slow network
-  setTimeout(hideSplash, 2500);
+  // Splash kamida 3 soniya ko'rinadi, keyin yashiriladi
+  const splashStart = Date.now();
 
   try {
     const [prodData, catData] = await Promise.all([
@@ -530,7 +522,10 @@ async function loadProducts() {
   } catch (err) {
     console.error('loadProducts error:', err);
   } finally {
-    hideSplash();
+    // Kamida 3 soniya kutamiz
+    const elapsed = Date.now() - splashStart;
+    const remaining = Math.max(0, 3000 - elapsed);
+    setTimeout(hideSplash, remaining);
   }
 }
 
