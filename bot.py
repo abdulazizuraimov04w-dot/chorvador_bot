@@ -645,11 +645,7 @@ async def api_miniapp_order(request):
 
         delivery_date = datetime.date.fromisoformat(delivery_date_str) if delivery_date_str else today_uz
 
-        min_amount = await models.get_min_order_amount()
-        if float(total_price) < min_amount:
-            return web.json_response({
-                "error": f"Minimal buyurtma summasi — {int(min_amount):,} so'm. Hozirgi savatingiz: {int(total_price):,} so'm.".replace(",", " ")
-            }, status=400)
+
 
         cart_items = [
             {
