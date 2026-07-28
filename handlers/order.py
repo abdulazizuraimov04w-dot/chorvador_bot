@@ -24,17 +24,16 @@ async def start_order(message: Message, state: FSMContext):
         
     products = await models.get_active_products()
     if not products:
-        await message.answer("Hozirda sotuvda mahsulotlar mavjud emas. Iltimos, keyinroq urinib ko'ring.")
+        await message.answer("🍽️ Hozirda oshxonalarda taomlar mavjud emas. Iltimos, keyinroq urinib ko'ring.")
         return
         
     await state.clear()
-    # Initialize empty cart in state
     await state.update_data(cart=[])
     
     keyboard = keyboards.get_products_keyboard(products)
     await message.answer(
-        "🍊 **Mandarin Supermarket mahsulotlari:**\n\n"
-        "Sotib olmoqchi bo'lgan mahsulotni tanlang:",
+        "🍽️ **Taomim — Hamkor oshxonalar menyusi:**\n\n"
+        "Buyurtma qilmoqchi bo'lgan taomni tanlang:",
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
@@ -44,13 +43,13 @@ async def start_order(message: Message, state: FSMContext):
 async def back_to_products(callback: CallbackQuery, state: FSMContext):
     products = await models.get_active_products()
     if not products:
-        await callback.message.edit_text("Hozirda sotuvda mahsulotlar mavjud emas.")
+        await callback.message.edit_text("🍽️ Hozirda taomlar mavjud emas.")
         return
         
     keyboard = keyboards.get_products_keyboard(products)
     await callback.message.edit_text(
-        "🍊 **Mandarin Supermarket mahsulotlari:**\n\n"
-        "Sotib olmoqchi bo'lgan mahsulotni tanlang:",
+        "🍽️ **Taomim menyusi:**\n\n"
+        "Qo'shimcha taom tanlang:",
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
@@ -79,12 +78,13 @@ async def process_product_selection(callback: CallbackQuery, state: FSMContext):
         
     await state.update_data(current_product_id=product_id, current_product_name=product['name'], current_product_price=float(product['price']))
     
-    qty_unit = "dona" if product['name'] == "Malako" else "kg"
+    rest_name = f"\n🏪 {product['restaurant_name']}" if product.get('restaurant_name') else ""
+    cat_name  = f"\n{product.get('category_icon','')} {product['category_name']}" if product.get('category_name') else ""
     
     await callback.message.edit_text(
-        f"🥛 **{product['name']}**\n"
-        f"💵 Narxi: {int(product['price']):,} so'm / {qty_unit}\n\n"
-        f"Qancha miqdorda buyurtma qilmoqchisiz? Quyidagi tugmalardan birini tanlang yoki o'zingiz xohlagan miqdorni kiriting (masalan: 1.5 yoki 3):".replace(",", " "),
+        f"🍽️ **{product['name']}**{rest_name}{cat_name}\n"
+        f"💵 Narxi: {int(product['price']):,} so'm\n\n"
+        f"Necha dona buyurtma qilmoqchisiz? Quyidagi tugmalardan birini tanlang yoki o'zingiz kiriting:".replace(",", " "),
         reply_markup=keyboards.get_quantity_keyboard(product_id)
     )
     await state.set_state(OrderStates.waiting_for_quantity)
@@ -148,26 +148,23 @@ async def show_cart(message: Message, state: FSMContext):
         await state.clear()
         return
         
-    text = "🛒 **Savatingiz tarkibi:**\n\n"
+    text = "🛒 **Savatingiz:**\n\n"
     total_price = Decimal("0.00")
     
     for item in cart:
-        qty_unit = "dona" if item['name'] == "Malako" else "kg"
         item_total = Decimal(str(item['quantity'])) * Decimal(str(item['price']))
         total_price += item_total
-        text += f"**{item['name']}**: {item['quantity']} {qty_unit} x {int(item['price']):,} so'm = {int(item_total):,} so'm\n"
+        text += f"**{item['name']}**: {item['quantity']} dona × {int(item['price']):,} so'm = {int(item_total):,} so'm\n"
         
     text += f"\n💵 **Jami summa:** {int(total_price):,} so'm\n\n".replace(",", " ")
-    text += "Yana mahsulot qo'shmoqchimisiz yoki buyurtmani tasdiqlaysizmi?"
+    text += "Yana taom qo'shmoqchimisiz yoki buyurtmani tasdiqlaysizmi?"
     
-    # Create action keyboard
     builder = InlineKeyboardBuilder()
-    builder.add(InlineKeyboardButton(text="🧀 Yana qo'shish", callback_data="add_more_products"))
+    builder.add(InlineKeyboardButton(text="🍽️ Yana qo'shish", callback_data="add_more_products"))
     builder.add(InlineKeyboardButton(text="✅ Buyurtmani tasdiqlash", callback_data="confirm_order"))
     builder.add(InlineKeyboardButton(text="❌ Savatni tozalash", callback_data="clear_cart"))
     builder.adjust(2, 1)
     
-    # Send a new message instead of editing if it was a text input, to avoid errors
     await message.answer(text, reply_markup=builder.as_markup(), parse_mode="Markdown")
     await state.set_state(OrderStates.confirming_order)
 
@@ -221,16 +218,6 @@ async def confirm_order(callback: CallbackQuery, state: FSMContext):
             'price': Decimal(str(item['price']))
         })
 
-    # Minimal buyurtma summasini tekshirish (70 000 so'm)
-    min_amount = await models.get_min_order_amount()
-    if float(total_price) < min_amount:
-        await callback.answer(
-            f"⚠️ Minimal buyurtma summasi — {int(min_amount):,} so'm!\n"
-            f"Hozirgi savat: {int(total_price):,} so'm. Yana {int(min_amount - float(total_price)):,} so'mlik mahsulot qo'shing.".replace(",", " "),
-            show_alert=True
-        )
-        return
-        
     try:
         # Save to DB
         order_id = await models.create_order(
@@ -277,15 +264,13 @@ async def confirm_order(callback: CallbackQuery, state: FSMContext):
             parse_mode="Markdown"
         )
         
-        # Clear FSM
         await state.clear()
         
-        # Check admin for main menu keyboard
         user = await models.get_user_by_telegram_id(telegram_id)
         is_admin = user.get("is_admin", False) if user else False
         
         await callback.message.answer(
-            "Xizmatimizdan foydalanganingiz uchun rahmat! 🍊",
+            "🍽️ Taomingiz yetkazib beriladi! Rahmat! 😊",
             reply_markup=keyboards.get_main_menu_keyboard(is_admin=is_admin)
         )
         
@@ -310,8 +295,7 @@ async def confirm_order(callback: CallbackQuery, state: FSMContext):
         # Format products list for notification
         items_text = ""
         for item in cart:
-            qty_unit = "dona" if item['name'] == "Malako" else "kg"
-            items_text += f"  - {item['name']}: {item['quantity']} {qty_unit}\n"
+            items_text += f"  - {item['name']}: {item['quantity']} dona\n"
             
         courier_info = f"**Kuryer:** {courier_name}\n" if courier_name else ""
         mfy_info = f"**Mahalla (MFY):** {mfy_name} MFY\n" if mfy_name else ""
@@ -325,9 +309,9 @@ async def confirm_order(callback: CallbackQuery, state: FSMContext):
             f"**Telefon:** {user['phone_number']}\n"
             f"{mfy_info}"
             f"{courier_info}"
-            f"**Mahsulotlar:**\n{items_text}\n"
+            f"**Taomlar:**\n{items_text}\n"
             f"💵 **Jami summa:** {int(total_price):,} so'm\n\n".replace(",", " ") +
-            f"*Batafsil ma'lumot va boshqarish uchun Web Panelga kiring!*"
+            f"*Batafsil ma'lumot uchun Web Panelga kiring!*"
         )
         
         for admin_id in admin_ids:

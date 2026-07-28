@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Mandarin Supermarket</title>
+<title>Taomim</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 :root {
@@ -269,8 +269,8 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
      SPLASH SCREEN
      ============================================================ -->
 <div id="splash">
-  <img id="splash-logo" src="/static/welcome.jpg" alt="Mandarin Supermarket" style="border-radius:24px;box-shadow:0 8px 24px rgba(0,0,0,0.12);">
-  <div id="splash-tagline">🍊 Mandarin Supermarket</div>
+  <div id="splash-logo" style="font-size:80px;line-height:1;animation:splashPop 0.5s cubic-bezier(0.34,1.56,0.64,1) both;">🍽️</div>
+  <div id="splash-tagline">Taomim — mazali taomlar</div>
   <div id="splash-dots">
     <span></span><span></span><span></span>
   </div>
@@ -279,14 +279,14 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 <!-- CATALOG PAGE -->
 <div class="page active" id="page-catalog">
   <div class="topnav">
-    <div class="topnav-title">🍊 Mandarin</div>
+    <div class="topnav-title">🍽️ Taomim</div>
     <button class="cart-btn" onclick="goPage('cart')" id="cart-topbtn" style="display:none">
       🛒 Savat <span class="cart-count" id="cart-count-top">0</span>
     </button>
   </div>
   <div class="catalog-header" style="padding-bottom:6px;">
-    <h2>Mandarin Supermarket</h2>
-    <p>Oziq-ovqat va ro'zg'or mahsulotlari</p>
+    <h2>Hamkor oshxonalar</h2>
+    <p>🕒 24/7 · Tez yetkazish · Masofa bo'yicha narx</p>
   </div>
 
   <!-- SEARCH BAR -->
@@ -308,7 +308,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
     </div>
     <div class="loyalty-sub">
       <span id="loyalty-sub-text">Sovg'agacha 10 ta buyurtma qoldi</span>
-      <span style="font-size:10px;opacity:0.85">Min. 70,000 so'm</span>
+      <span style="font-size:10px;opacity:0.85">🍽️ Taomim</span>
     </div>
   </div>
 
@@ -329,16 +329,13 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
     <div class="topnav-title">🛒 Savatcha</div>
     <div></div>
   </div>
-  <!-- CART MIN AMOUNT PROGRESS -->
-  <div class="cart-min-progress" id="cart-min-progress-box">
-    <div class="cmp-head">
-      <span>🛒 Minimal buyurtma</span>
-      <span id="cmp-amount-label">0 / 70 000 so'm</span>
+  <!-- DELIVERY FEE INFO (shown when cart is not empty) -->
+  <div id="cart-delivery-box" style="display:none;margin:12px 16px 4px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;">
+    <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;margin-bottom:6px;">
+      <span>🚴 Yetkazib berish</span>
+      <span id="delivery-fee-label" style="color:var(--accent)">Hisoblanmoqda...</span>
     </div>
-    <div class="cmp-bar">
-      <div class="cmp-fill" id="cmp-fill-bar" style="width:0%"></div>
-    </div>
-    <div class="cmp-sub" id="cmp-sub-text">Yana 70 000 so'mlik mahsulot qo'shing</div>
+    <div style="font-size:11px;color:var(--muted);">Eng uzoq oshxonaga masofa asosida hisoblanadi</div>
   </div>
   <div id="cart-content"></div>
   <button class="main-btn" id="cart-order-btn" onclick="goPage('order')">Buyurtma berish →</button>
@@ -557,40 +554,7 @@ async function loadProducts() {
   }
 }
 
-function renderCart() {
-  const items = getCartItems();
-  const content = document.getElementById('cart-content');
-  const btn     = document.getElementById('cart-order-btn');
-  const minProgressBox = document.getElementById('cart-min-progress-box');
 
-  if (!items.length) {
-    if (minProgressBox) minProgressBox.style.display = 'none';
-    content.innerHTML = `<div class="cart-empty"><div class="emoji">🛒</div><p>Savatcha bo'sh<br>Katalogdan mahsulot tanlang</p></div>`;
-    btn.disabled=true; btn.textContent='Mahsulot tanlang'; return;
-  }
-
-  const total = items.reduce((s,i)=>s+i.subtotal,0);
-  const minAmount = userLoyaltyInfo?.min_amount || 70000;
-
-  if (minProgressBox) {
-    minProgressBox.style.display = 'flex';
-    const pct = Math.min(100, (total / minAmount) * 100);
-    const fill = document.getElementById('cmp-fill-bar');
-    const label = document.getElementById('cmp-amount-label');
-    const sub = document.getElementById('cmp-sub-text');
-
-    fill.style.width = pct + '%';
-    label.textContent = `${fmtPrice(total)} / ${fmtPrice(minAmount)} so'm`;
-
-    if (total >= minAmount) {
-      fill.classList.add('ok');
-      sub.innerHTML = `<b style="color:var(--accent)">🎉 Minimal summagaga yetildi! Usbu buyurtma +1 SOVG'A qadami beradi!</b>`;
-      btn.disabled = false;
-      btn.disabled = true;
-      btn.textContent = `Yana ${fmtPrice(diff)} so'm qo'shing`;
-    }
-  }
-}
 
 function renderCategoryTabs() {
   const wrap = document.getElementById('category-tabs-wrap');
@@ -619,11 +583,19 @@ function onSearchInput(query) {
   renderProducts();
 }
 
-const EMOJIS = { 'Mandarin':'🍊','Olma':'🍎','Banan':'🍌','Coca':'🥤','Pepsi':'🥤','Fanta':'🥤','Non':'🍞','Sut':'🧀','Pishloq':'🧀','Qatiq':'🥛','Shakar':'🍚','Choy':'🍵','Kofe':'☕' };
+const EMOJIS = {
+  'Osh':'🍚','Lag\'man':'🍜','Mastava':'🍜','Manti':'🫕','Samsa':'🫔',
+  'Kabob':'🍖','Shashlik':'🍖','Do\'lma':'🍒','Norin':'🍝',
+  'Sho\'rva':'🍲','Go\'sht':'🥩','Tovuq':'🍗','Baliq':'🐟',
+  'Salat':'🥗','Non':'🍞','Somsa':'🫔','Samosa':'🫔',
+  'Choy':'☕','Kofe':'☕','Limonad':'🥤','Kompot':'🥤',
+  'Tort':'🍰','Donut':'🍩','Pishloq':'🧀','Mandarin':'🍊'
+};
 function getEmoji(p) {
-  if (p.category_icon) return p.category_icon;
-  for (const [k,v] of Object.entries(EMOJIS)) if (p.name && p.name.toLowerCase().includes(k.toLowerCase())) return v;
-  return '🛍️';
+  const name = typeof p === 'string' ? p : (p?.name || '');
+  if (p?.category_icon) return p.category_icon;
+  for (const [k,v] of Object.entries(EMOJIS)) if (name.toLowerCase().includes(k.toLowerCase())) return v;
+  return '🍽️';
 }
 
 function productImgHtml(p) {
@@ -647,16 +619,20 @@ function renderProducts() {
   }
 
   if (!filtered.length) {
-    list.innerHTML = '<div class="loader" style="grid-column:1/-1;text-align:center;padding:40px 10px;">Mahsulotlar topilmadi 🛍️</div>';
+    list.innerHTML = '<div class="loader" style="grid-column:1/-1;text-align:center;padding:40px 10px;">🍽️ Taomlar topilmadi</div>';
     return;
   }
   list.innerHTML = filtered.map(p => {
     const qty = cart[p.id] || 0;
+    const restBadge = p.restaurant_name
+      ? `<div style="font-size:10px;color:var(--muted);margin-top:1px;">🏪 ${esc(p.restaurant_name)}</div>`
+      : '';
     return `
       <div class="product-card">
         <div class="product-img-wrap">${productImgHtml(p)}</div>
         <div class="product-body">
           <div class="product-name">${esc(p.name)}</div>
+          ${restBadge}
           <div class="product-price">${fmtPrice(p.price)} <small>so'm</small></div>
           <div id="ctrl-${p.id}">${qty === 0 ? addBtnHtml(p.id) : qtyCtrlHtml(p.id, qty)}</div>
         </div>
@@ -697,23 +673,30 @@ function cartItemImgHtml(p) {
   if(p.image_url) return `<img class="cart-item-img" src="${esc(p.image_url)}" alt="${esc(p.name)}" onerror="this.outerHTML='<div class=\\'cart-item-img-placeholder\\'>${getEmoji(p.name)}</div>'">`;
   return `<div class="cart-item-img-placeholder">${getEmoji(p.name)}</div>`;
 }
+let deliveryFeeAmount = 0;
+
 function renderCart() {
   const items = getCartItems();
   const content = document.getElementById('cart-content');
   const btn     = document.getElementById('cart-order-btn');
+  const delivBox = document.getElementById('cart-delivery-box');
+
   if (!items.length) {
-    content.innerHTML = `<div class="cart-empty"><div class="emoji">🛒</div><p>Savatcha bo'sh<br>Katalogdan mahsulot tanlang</p></div>`;
-    btn.disabled=true; btn.textContent='Mahsulot tanlang'; return;
+    if (delivBox) delivBox.style.display = 'none';
+    content.innerHTML = `<div class="cart-empty"><div class="emoji">🛒</div><p>Savatcha bo'sh<br>Katalogdan taom tanlang</p></div>`;
+    btn.disabled = true; btn.textContent = 'Taom tanlang'; return;
   }
-  const total = items.reduce((s,i)=>s+i.subtotal,0);
+
+  const total = items.reduce((s,i) => s+i.subtotal, 0);
   content.innerHTML = `
     <div class="cart-items">
-      ${items.map(i=>`
+      ${items.map(i => `
         <div class="cart-item">
           ${cartItemImgHtml(i)}
           <div class="cart-item-info">
             <div class="cart-item-name">${esc(i.name)}</div>
             <div class="cart-item-price">${fmtPrice(i.price)} so'm × ${i.quantity}</div>
+            ${i.restaurant_name ? `<div style="font-size:10px;color:var(--muted)">🏪 ${esc(i.restaurant_name)}</div>` : ''}
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
             <div class="cart-item-total">${fmtPrice(i.subtotal)} so'm</div>
@@ -726,12 +709,56 @@ function renderCart() {
         </div>`).join('')}
     </div>
     <div class="cart-summary">
-      ${items.map(i=>`<div class="summary-row"><span>${esc(i.name)} × ${i.quantity}</span><span>${fmtPrice(i.subtotal)} so'm</span></div>`).join('')}
-      <div class="summary-row total"><span>Jami</span><span class="val">${fmtPrice(total)} so'm</span></div>
+      ${items.map(i => `<div class="summary-row"><span>${esc(i.name)} × ${i.quantity}</span><span>${fmtPrice(i.subtotal)} so'm</span></div>`).join('')}
+      <div class="summary-row" id="delivery-summary-row" style="color:var(--muted)">
+        <span>🚴 Yetkazish</span><span id="delivery-summary-val">Hisoblanmoqda...</span>
+      </div>
+      <div class="summary-row total"><span>Jami</span><span class="val" id="cart-total-val">${fmtPrice(total)} so'm</span></div>
     </div>`;
-  btn.disabled=false; btn.textContent=`Buyurtma berish → ${fmtPrice(total)} so'm`;
+
+  btn.disabled = false;
+  btn.textContent = `Buyurtma berish → ${fmtPrice(total)} so'm`;
+
+  // Delivery fee hisoblash
+  if (delivBox) delivBox.style.display = 'flex';
+  fetchDeliveryFee(items);
 }
-function changeQtyCart(id,delta){ changeQty(id,delta); renderCart(); }
+function changeQtyCart(id, delta) { changeQty(id, delta); renderCart(); }
+
+// Delivery fee olish
+async function fetchDeliveryFee(items) {
+  const label = document.getElementById('delivery-fee-label');
+  const summaryVal = document.getElementById('delivery-summary-val');
+  if (!USER_TG_ID || !items || !items.length) return;
+  try {
+    const productIds = [...new Set(items.map(i => i.id))];
+    const data = await apiFetch('/api/delivery/calculate', 'POST', {
+      telegram_id: USER_TG_ID,
+      product_ids: productIds
+    });
+    if (data && data.delivery_fee !== undefined) {
+      deliveryFeeAmount = data.delivery_fee;
+      const feeText = data.delivery_fee > 0
+        ? `${fmtPrice(data.delivery_fee)} so'm (${data.distance_km?.toFixed(1)} km)`
+        : 'Bepul';
+      if (label) label.textContent = feeText;
+      if (summaryVal) summaryVal.textContent = feeText;
+      // Total yangilash
+      const items2 = getCartItems();
+      const total = items2.reduce((s,i) => s+i.subtotal, 0);
+      const grandTotal = total + deliveryFeeAmount;
+      const totalEl = document.getElementById('cart-total-val');
+      const btn = document.getElementById('cart-order-btn');
+      if (totalEl) totalEl.textContent = `${fmtPrice(grandTotal)} so'm`;
+      if (btn && !btn.disabled) btn.textContent = `Buyurtma berish \u2192 ${fmtPrice(grandTotal)} so'm`;
+    } else {
+      if (label) label.textContent = 'Aniqlanmadi';
+      if (summaryVal) summaryVal.textContent = '—';
+    }
+  } catch(e) {
+    if (label) label.textContent = '—';
+  }
+}
 
 // ============================================================
 // ORDER FORM
@@ -842,38 +869,46 @@ function requestLocation() {
 // CONFIRM ORDER
 // ============================================================
 async function confirmOrder() {
-  const btn=document.getElementById('confirm-btn');
-  btn.disabled=true; btn.textContent='⏳ Yuborilmoqda...';
-  const items=getCartItems();
-  if(!items.length){ showToast('Savatcha bo\'sh!'); btn.disabled=false; return; }
-  const today=new Date();
-  const deliveryDate=selectedDay==='tomorrow'
+  const btn = document.getElementById('confirm-btn');
+  btn.disabled = true; btn.textContent = '⏳ Yuborilmoqda...';
+  const items = getCartItems();
+  if (!items.length) { showToast('Savatcha bo\'sh!'); btn.disabled = false; return; }
+  const today = new Date();
+  const deliveryDate = selectedDay === 'tomorrow'
     ? new Date(today.setDate(today.getDate()+1)).toISOString().split('T')[0]
     : new Date().toISOString().split('T')[0];
-  const timeSlot=TIME_MAP[selectedTime];
-  const total=items.reduce((s,i)=>s+i.subtotal,0);
-  const payload={
-    telegram_id:USER_TG_ID,
-    items:items.map(i=>({product_id:i.id,quantity:i.quantity,price:i.price})),
-    total_price:total, delivery_date:deliveryDate,
-    delivery_time_start:timeSlot.start, delivery_time_end:timeSlot.end,
-    latitude:userLocation?.lat||null, longitude:userLocation?.lon||null
+  const timeSlot = TIME_MAP[selectedTime];
+  const total = items.reduce((s,i) => s+i.subtotal, 0);
+  const payload = {
+    telegram_id: USER_TG_ID,
+    items: items.map(i => ({ product_id: i.id, quantity: i.quantity, price: i.price })),
+    total_price: total,
+    delivery_fee: deliveryFeeAmount || 0,
+    delivery_date: deliveryDate,
+    delivery_time_start: timeSlot.start,
+    delivery_time_end: timeSlot.end,
+    latitude: userLocation?.lat || null,
+    longitude: userLocation?.lon || null
   };
-  const result=await apiFetch('/api/miniapp/order','POST',payload);
-  btn.disabled=false;
-  if(result?.success){
-    const dayLabel=selectedDay==='today'?'Bugun':'Ertaga';
-    const timeLabel={morning:'Ertalab 06:00–07:00',noon:'Kunduz 12:00–13:00',evening:'Kechqurun 18:00–19:00'}[selectedTime];
-    document.getElementById('success-detail').innerHTML=`
+  const result = await apiFetch('/api/miniapp/order', 'POST', payload);
+  btn.disabled = false;
+  if (result?.success) {
+    const dayLabel = selectedDay === 'today' ? 'Bugun' : 'Ertaga';
+    const timeLabel = { morning:'Ertalab 06:00–07:00', noon:'Kunduz 12:00–13:00', evening:'Kechqurun 18:00–19:00' }[selectedTime];
+    const grandTotal = total + (deliveryFeeAmount || 0);
+    document.getElementById('success-detail').innerHTML = `
       📅 <b>${dayLabel}</b>, ${timeLabel}<br>
-      📦 ${items.map(i=>`${getEmoji(i.name)} ${i.name} × ${i.quantity}`).join('<br>')}<br>
-      💰 Jami: <b>${fmtPrice(total)} so'm</b>`;
+      📦 ${items.map(i => `${getEmoji(i)} ${i.name} × ${i.quantity}`).join('<br>')}<br>
+      🚴 Yetkazish: <b>${fmtPrice(deliveryFeeAmount || 0)} so'm</b><br>
+      💰 Jami: <b>${fmtPrice(grandTotal)} so'm</b>`;
     document.getElementById('success-screen').classList.add('show');
     tg.HapticFeedback.notificationOccurred('success');
-    cart={}; updateCartBadge(); renderProducts();
+    deliveryFeeAmount = 0;
+    cart = {}; updateCartBadge(); renderProducts();
   } else {
-    showToast(result?.error||'Xatolik yuz berdi. Qayta urinib ko\'ring.');
-    btn.textContent=`✅ Tasdiqlash — ${fmtPrice(total)} so'm`;
+    showToast(result?.error || 'Xatolik yuz berdi. Qayta urinib ko\'ring.');
+    const grandTotal = total + (deliveryFeeAmount || 0);
+    btn.textContent = `✅ Tasdiqlash — ${fmtPrice(grandTotal)} so'm`;
   }
 }
 function afterSuccess(){ document.getElementById('success-screen').classList.remove('show'); goPage('catalog'); }

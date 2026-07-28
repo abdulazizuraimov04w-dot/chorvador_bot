@@ -39,7 +39,7 @@ async def cmd_start(message: Message, state: FSMContext):
         logger.info(f"User {telegram_id} ({user['full_name']}) started the bot. Already registered.")
         # Send main menu reply keyboard first so the customer has it permanently
         await message.answer(
-            "🍊 Mandarin Supermarket yetkazib berish xizmatiga xush kelibsiz! 🛒🛍️",
+            "🍽️ Taomim — hamkor oshxonalardan tez va mazali taomlar! 🚀",
             reply_markup=keyboards.get_main_menu_keyboard(is_admin=is_admin)
         )
         
@@ -47,21 +47,23 @@ async def cmd_start(message: Message, state: FSMContext):
         base_url = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
         miniapp_url = f"{base_url}/miniapp"
         inline_keyboard = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="🛒 Buyurtma berish", web_app=WebAppInfo(url=miniapp_url))
+            InlineKeyboardButton(text="🍽️ Taom buyurtma berish", web_app=WebAppInfo(url=miniapp_url))
         ]])
         
         # Then send greeting message with the inline button
         await message.answer(
-            f"Assalomu alaykum, {user['full_name']}!\n"
-            "Buyurtma berish uchun pastdagi '🛒 Buyurtma berish' tugmasini bosing:",
+            f"Assalomu alaykum, {user['full_name']}! 👋\n\n"
+            "🍽️ Taomim orqali hamkor oshxonalardan qulay buyurtma bering.\n"
+            "Pastdagi tugmani bosing:",
             reply_markup=inline_keyboard
         )
         return
 
     logger.info(f"New user {telegram_id} started the bot. Initiating registration.")
     await message.answer(
-        "Assalomu alaykum! 🍊 **Mandarin Supermarket** onlayn do'koni va yetkazib berish botiga xush kelibsiz.\n\n"
-        "Xizmatdan foydalanish uchun ro'yxatdan o'tishingiz lozim.\n\n"
+        "Assalomu alaykum! 🍽️ **Taomim** — hamkor oshxonalardan qulay va tez taom yetkazib berish xizmatiga xush kelibsiz!\n\n"
+        "24/7 ishlaydi · Masofa bo'yicha narx · Ko'plab oshxonalar\n\n"
+        "Xizmatdan foydalanish uchun ro'yxatdan o'tishingiz lozim.\n"
         "Iltimos, **ism va familiyangizni** kiriting (masalan: Alisher Usmonov):",
         parse_mode="Markdown",
         reply_markup=ReplyKeyboardRemove()
@@ -146,19 +148,24 @@ async def process_location(message: Message, state: FSMContext):
         )
         
         await message.answer(
-            "🍊 Mandarin Supermarket yetkazib berish xizmatiga xush kelibsiz! 🛒🛍️",
+            "🍽️ Taomim — hamkor oshxonalardan tez va mazali taomlar! 🚀",
             reply_markup=keyboards.get_main_menu_keyboard(is_admin=is_admin)
         )
         
         base_url = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
         miniapp_url = f"{base_url}/miniapp"
         inline_keyboard = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="🛒 Buyurtma berish", web_app=WebAppInfo(url=miniapp_url))
+            InlineKeyboardButton(text="🍽️ Taom buyurtma berish", web_app=WebAppInfo(url=miniapp_url))
         ]])
         
         await message.answer(
-            f"Assalomu alaykum hurmatli {full_name}!\n"
-            "Ro'yxatdan o'tish muvaffaqiyatli yakunlandi. Quyidagi '🛒 Buyurtma berish' tugmasini bosish orqali buyurtma berishingiz mumkin:",
+            f"🎉 Xush kelibsiz, {full_name}!\n\n"
+            "✅ Ro'yxatdan o'tish muvaffaqiyatli yakunlandi!\n\n"
+            "🍽️ Taomim orqali hamkor oshxonalardan qulay buyurtma bering:\n"
+            "  • Ko'plab taom turlari\n"
+            "  • Tez yetkazish\n"
+            "  • 24/7 ishlaydi\n\n"
+            "Pastdagi tugmani bosib buyurtma bering:",
             reply_markup=inline_keyboard
         )
         await state.clear()
