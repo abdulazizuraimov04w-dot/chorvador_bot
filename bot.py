@@ -1248,13 +1248,19 @@ async def api_calculate_delivery(request):
         if not telegram_id:
             return web.json_response({"error": "telegram_id kerak"}, status=400)
 
-        # 1. Foydalanuvchi koordinatasini bazadan olish
-        user = await models.get_user_by_telegram_id(int(telegram_id))
-        if not user:
-            return web.json_response({"error": "Foydalanuvchi topilmadi"}, status=404)
+        # 1. Foydalanuvchi koordinatasini olish (agar so'rovda berilgan bo'lsa shuni, bo'lmasa DB dan)
+        user_lat = data.get('latitude')
+        user_lon = data.get('longitude')
+        if user_lat is not None and user_lon is not None:
+            user_lat = float(user_lat)
+            user_lon = float(user_lon)
+        else:
+            user = await models.get_user_by_telegram_id(int(telegram_id))
+            if not user:
+                return web.json_response({"error": "Foydalanuvchi topilmadi"}, status=404)
+            user_lat = user.get('latitude')
+            user_lon = user.get('longitude')
 
-        user_lat = user.get('latitude')
-        user_lon = user.get('longitude')
         if not user_lat or not user_lon:
             return web.json_response({"error": "Manzil saqlanmagan"}, status=400)
 
@@ -1283,6 +1289,31 @@ async def api_calculate_delivery(request):
         })
     except Exception as e:
         logger.error(f"api_calculate_delivery: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+
+async def api_get_miniapp_user(request):
+    """Foydalanuvchi ma'lumotlari (profil va koordinatalari)ni olish."""
+    try:
+        from database import models
+        telegram_id = request.match_info.get('telegram_id')
+        if not telegram_id:
+            return web.json_response({"error": "telegram_id ko'rsatilmadi"}, status=400)
+            
+        user = await models.get_user_by_telegram_id(int(telegram_id))
+        if not user:
+            return web.json_response({"error": "Foydalanuvchi topilmadi"}, status=404)
+            
+        return web.json_response({
+            "id": user['id'],
+            "telegram_id": user['telegram_id'],
+            "full_name": user['full_name'],
+            "phone_number": user['phone_number'],
+            "latitude": user.get('latitude'),
+            "longitude": user.get('longitude')
+        })
+    except Exception as e:
+        logger.error(f"api_get_miniapp_user: {e}")
         return web.json_response({"error": str(e)}, status=500)
 
 # WEB SERVER
@@ -1376,6 +1407,7 @@ async def start_web_server():
     app.router.add_get('/api/settings/delivery', api_get_delivery_settings)
     app.router.add_post('/api/settings/delivery', api_save_delivery_settings)
     app.router.add_post('/api/delivery/calculate', api_calculate_delivery)
+    app.router.add_get('/api/miniapp/user/{telegram_id}', api_get_miniapp_user)
 
     # --- Static Pages ---
     static_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')

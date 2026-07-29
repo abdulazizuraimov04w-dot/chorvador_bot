@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Taomim</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 :root {
   --bg: #f5f6fa;
@@ -380,25 +382,57 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 <div class="page" id="page-order">
   <div class="topnav">
     <button class="topnav-back" onclick="goPage('cart')">←</button>
-    <div class="topnav-title">📋 Buyurtma</div>
+    <div class="topnav-title">📋 Buyurtmani rasmiylashtirish</div>
     <div></div>
   </div>
-  <div class="order-form">
+  <div class="order-form" style="padding-bottom:100px;">
+    
+    <!-- 📍 STEP 1: LOCATION & MAP -->
     <div class="form-section">
-      <div class="form-section-title">📍 Yetkazish manzili</div>
-      <div class="location-box">
-        <div class="location-icon">📍</div>
+      <div class="form-section-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>📍 1. Yetkazish manzili</span>
+        <span style="font-size:11px;color:var(--accent-dark);font-weight:600;" id="delivery-calc-status">⚡ Real-vaqt hisoblanmoqda</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px;">
+        <button type="button" onclick="getCurrentGPSLocation()" style="display:flex;align-items:center;justify-content:center;gap:8px;background:var(--accent);color:#fff;border:none;padding:12px 16px;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;width:100%;box-shadow:0 3px 10px rgba(46,204,113,0.3);">
+          📍 Joylashuvimni ulashish (GPS)
+        </button>
+        <div style="font-size:11px;color:var(--muted);text-align:center;">yoki xaritaning ustiga bosib belgilang 👇</div>
+      </div>
+
+      <div id="delivery-map" style="width:100%;height:200px;border-radius:12px;border:1px solid var(--border);margin-bottom:10px;z-index:1;"></div>
+
+      <div class="location-box" style="margin-top:6px;">
+        <div class="location-icon">📌</div>
         <div class="location-text">
-          <div class="location-name" id="location-name">Saqlangan manzil ishlatiladi</div>
-          <div class="location-coords" id="location-coords"></div>
+          <div class="location-name" id="location-name">Tanlangan manzil</div>
+          <div class="location-coords" id="location-coords">Manzil yuklanmoqda...</div>
         </div>
-        <button class="location-change" onclick="requestLocation()">O'zgartirish</button>
       </div>
     </div>
+
+    <!-- 💳 STEP 2: PAYMENT METHOD -->
     <div class="form-section">
-      <div class="form-section-title">🧾 Buyurtma tarkibi</div>
+      <div class="form-section-title">💳 2. To'lov usuli</div>
+      <div class="modal-pay-grid" style="margin-top:4px;">
+        <div class="modal-pay-card selected" id="order-pay-cash" onclick="selectPayMethod('cash')">
+          <div class="modal-pay-icon">💵</div>
+          <div class="modal-pay-label">Kelganda<br>to'lanadi</div>
+        </div>
+        <div class="modal-pay-card" id="order-pay-click" onclick="selectPayMethod('click')">
+          <div class="modal-pay-icon">🔵</div>
+          <div class="modal-pay-label">Click<br>orqali</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 🧾 STEP 3: SUMMARY -->
+    <div class="form-section">
+      <div class="form-section-title">🧾 3. Buyurtma hisob-kitobi</div>
       <div class="order-items-preview" id="order-preview"></div>
     </div>
+
   </div>
   <button class="main-btn" id="confirm-btn" onclick="confirmOrder()">✅ Tasdiqlash</button>
 </div>
@@ -602,6 +636,16 @@ function renderLoyaltyCard() {
   }
 }
 
+async function loadUserProfile() {
+  if (!USER_TG_ID) return;
+  try {
+    const u = await apiFetch(`/api/miniapp/user/${USER_TG_ID}`);
+    if (u && u.latitude && u.longitude) {
+      userLocation = { lat: parseFloat(u.latitude), lon: parseFloat(u.longitude) };
+    }
+  } catch(e) { console.error('loadUserProfile error:', e); }
+}
+
 async function loadProducts() {
   const splashStart = Date.now();
   try {
@@ -610,6 +654,7 @@ async function loadProducts() {
       apiFetch('/api/categories')
     ]);
     loadLoyaltyInfo();
+    loadUserProfile();
     if (prodData && !prodData.error) {
       products = Array.isArray(prodData) ? prodData : [];
       categories = Array.isArray(catData) ? catData : [];
@@ -949,17 +994,30 @@ function renderCart() {
 }
 function changeQtyCart(id, delta) { changeQty(id, delta); renderCart(); }
 
-// Delivery fee olish
-async function fetchDeliveryFee(items) {
+// Delivery fee olish (customLat va customLon berilsa shunga asoslanib aniq recalculate qiladi)
+async function fetchDeliveryFee(items, customLat = null, customLon = null) {
   const label = document.getElementById('delivery-fee-label');
   const summaryVal = document.getElementById('delivery-summary-val');
+  const calcStatus = document.getElementById('delivery-calc-status');
   if (!USER_TG_ID || !items || !items.length) return;
+  
+  if (calcStatus) calcStatus.textContent = '⏳ Hisoblanmoqda...';
+
   try {
     const productIds = [...new Set(items.map(i => i.id))];
-    const data = await apiFetch('/api/delivery/calculate', 'POST', {
+    const payload = {
       telegram_id: USER_TG_ID,
       product_ids: productIds
-    });
+    };
+    if (customLat !== null && customLon !== null) {
+      payload.latitude = customLat;
+      payload.longitude = customLon;
+    } else if (userLocation) {
+      payload.latitude = userLocation.lat;
+      payload.longitude = userLocation.lon;
+    }
+
+    const data = await apiFetch('/api/delivery/calculate', 'POST', payload);
     if (data && data.delivery_fee !== undefined) {
       deliveryFeeAmount = data.delivery_fee;
       const feeText = data.delivery_fee > 0
@@ -967,68 +1025,150 @@ async function fetchDeliveryFee(items) {
         : 'Bepul';
       if (label) label.textContent = feeText;
       if (summaryVal) summaryVal.textContent = feeText;
-      // Total yangilash
-      const items2 = getCartItems();
-      const total = items2.reduce((s,i) => s+i.subtotal, 0);
-      const grandTotal = total + deliveryFeeAmount;
-      const totalEl = document.getElementById('cart-total-val');
-      const btn = document.getElementById('cart-order-btn');
-      if (totalEl) totalEl.textContent = `${fmtPrice(grandTotal)} so'm`;
-      if (btn && !btn.disabled) btn.textContent = `Buyurtma berish \u2192 ${fmtPrice(grandTotal)} so'm`;
+      if (calcStatus) calcStatus.textContent = `⚡ ${feeText}`;
+      
+      // Total va render Order Formni zudlik bilan yangilash
+      renderOrderPreviewOnly();
     } else {
       if (label) label.textContent = 'Aniqlanmadi';
       if (summaryVal) summaryVal.textContent = '—';
+      if (calcStatus) calcStatus.textContent = '—';
     }
   } catch(e) {
+    console.error('fetchDeliveryFee error:', e);
     if (label) label.textContent = '—';
+    if (calcStatus) calcStatus.textContent = '—';
+  }
+}
+
+// Xarita va Marker o'zgaruvchilari
+let leafMap = null;
+let leafMarker = null;
+
+function initDeliveryMap(lat, lon) {
+  const container = document.getElementById('delivery-map');
+  if (!container) return;
+
+  if (!leafMap) {
+    leafMap = L.map('delivery-map').setView([lat, lon], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap'
+    }).addTo(leafMap);
+
+    leafMarker = L.marker([lat, lon], { draggable: true }).addTo(leafMap);
+
+    // Marker surilganda (dragend)
+    leafMarker.on('dragend', function (e) {
+      const pos = e.target.getLatLng();
+      onMapLocationSelected(pos.lat, pos.lng);
+    });
+
+    // Xaritaning istalgan joyiga bosilganda (click)
+    leafMap.on('click', function (e) {
+      leafMarker.setLatLng(e.latlng);
+      onMapLocationSelected(e.latlng.lat, e.latlng.lng);
+    });
+  } else {
+    leafMap.setView([lat, lon], 15);
+    leafMarker.setLatLng([lat, lon]);
+  }
+}
+
+function onMapLocationSelected(lat, lon) {
+  userLocation = { lat, lon };
+  document.getElementById('location-name').textContent = 'Xaritadan tanlangan manzil';
+  document.getElementById('location-coords').textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+  tg.HapticFeedback.selectionChanged();
+  showToast('📍 Manzil o\'zgartirildi, narx qayta hisoblanmoqda...');
+  
+  // Real vaqtda yetkazib berish va umumiy summani darhol qayta hisoblash
+  const items = getCartItems();
+  fetchDeliveryFee(items, lat, lon);
+}
+
+function getCurrentGPSLocation() {
+  const btnStatus = document.getElementById('delivery-calc-status');
+  if (btnStatus) btnStatus.textContent = '🛰️ GPS aniqlanmoqda...';
+  
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => {
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+      userLocation = { lat, lon };
+      
+      document.getElementById('location-name').textContent = '📍 Joriy joylashuvingiz (GPS)';
+      document.getElementById('location-coords').textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+      
+      if (leafMap && leafMarker) {
+        leafMap.setView([lat, lon], 16);
+        leafMarker.setLatLng([lat, lon]);
+      } else {
+        initDeliveryMap(lat, lon);
+      }
+      
+      tg.HapticFeedback.notificationOccurred('success');
+      showToast('📍 Joylashuvingiz aniqlandi!');
+      
+      // Narxni ANIQ va DARHOL qayta hisoblash
+      const items = getCartItems();
+      fetchDeliveryFee(items, lat, lon);
+    }, err => {
+      console.error('GPS error:', err);
+      showToast('⚠️ Joylashuvni aniqlab bo\'lmadi. Xaritadan tanlang.');
+      if (btnStatus) btnStatus.textContent = '⚠️ GPS xatosi';
+    }, { enableHighAccuracy: true, timeout: 10000 });
+  } else {
+    showToast('⚠️ Qurilmada GPS qo\'llab-quvvatlanmaydi.');
   }
 }
 
 // ============================================================
-// ORDER FORM
+// ORDER FORM RENDER
 // ============================================================
 function renderOrderForm() {
   const items = getCartItems();
-  const total = items.reduce((s,i) => s+i.subtotal, 0);
-  const grandTotal = total + (deliveryFeeAmount || 0);
+  
+  // Standart koordinata (Toshkent markazi yoki mavjud saqlangan koordinata)
+  let startLat = userLocation?.lat || 41.31108;
+  let startLon = userLocation?.lon || 69.24056;
 
-  document.getElementById('order-preview').innerHTML = items.length
-    ? items.map(i => `
-        <div class="order-preview-row">
-          <span>${getEmoji(i)} ${esc(i.name)} × ${i.quantity} dona</span>
-          <span>${fmtPrice(i.subtotal)} so'm</span>
-        </div>`).join('') +
-      `<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--muted);padding:4px 0">
-        <span>🚴 Yetkazish</span><span>${deliveryFeeAmount > 0 ? fmtPrice(deliveryFeeAmount)+" so'm" : 'Hisoblanmoqda...'}</span>
-       </div>
-       <div class="order-preview-total"><span>Jami to'lov</span><span class="val">${fmtPrice(grandTotal)} so'm</span></div>`
-    : '<div style="color:var(--muted);font-size:13px;">Savat bo\'sh</div>';
+  renderOrderPreviewOnly();
 
-  if (userLocation) {
-    document.getElementById('location-name').textContent  = 'Yangi manzil tanlandi';
-    document.getElementById('location-coords').textContent = `${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}`;
-  }
-  document.getElementById('confirm-btn').textContent = `✅ Tasdiqlash — ${fmtPrice(grandTotal)} so'm`;
+  // Xaritani zudlik bilan ishga tushirish (DOM joyiga tushgandan so'ng)
+  setTimeout(() => {
+    initDeliveryMap(startLat, startLon);
+    if (leafMap) leafMap.invalidateSize();
+  }, 100);
+
+  // Dastlabki delivery fee ni hisoblash
+  fetchDeliveryFee(items, startLat, startLon);
 }
 
-function updateTimeButtons(currentHour) { /* time slots removed */ }
+function renderOrderPreviewOnly() {
+  const items = getCartItems();
+  const total = items.reduce((s,i) => s + i.subtotal, 0);
+  const grandTotal = total + (deliveryFeeAmount || 0);
 
-function selectDay(day) { selectedDay = day; }
-function selectTime(time) { selectedTime = time; }
-function requestLocation() {
-  tg.showPopup({title:'Manzil',message:'Joriy joylashuvingizni aniqlaylikmi?',
-    buttons:[{id:'yes',type:'default',text:'Ha, aniqlash'},{id:'no',type:'cancel',text:'Yo\'q'}]
-  },(btnId)=>{
-    if(btnId!=='yes') return;
-    if(navigator.geolocation){
-      navigator.geolocation.getCurrentPosition(pos=>{
-        userLocation={lat:pos.coords.latitude,lon:pos.coords.longitude};
-        document.getElementById('location-name').textContent  = 'Joriy joylashuv';
-        document.getElementById('location-coords').textContent = `${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}`;
-        showToast('📍 Manzil yangilandi!');
-      },()=>showToast('Manzilni aniqlab bo\'lmadi'));
-    }
-  });
+  const preview = document.getElementById('order-preview');
+  if (preview) {
+    preview.innerHTML = items.length
+      ? items.map(i => `
+          <div class="order-preview-row">
+            <span>${getEmoji(i)} ${esc(i.name)} × ${i.quantity} dona</span>
+            <span>${fmtPrice(i.subtotal)} so'm</span>
+          </div>`).join('') +
+        `<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--muted);padding:6px 0;border-top:1px dashed var(--border);margin-top:6px;">
+          <span>🚴 Yetkazib berish</span><span style="font-weight:700;color:var(--accent-dark);">${deliveryFeeAmount > 0 ? fmtPrice(deliveryFeeAmount) + " so'm" : 'Bepul / Hisoblanmoqda...'}</span>
+         </div>
+         <div class="order-preview-total"><span>Jami to'lov</span><span class="val" style="color:var(--accent-dark);font-size:18px;">${fmtPrice(grandTotal)} so'm</span></div>`
+      : '<div style="color:var(--muted);font-size:13px;">Savat bo\'sh</div>';
+  }
+
+  const confirmBtn = document.getElementById('confirm-btn');
+  if (confirmBtn) {
+    confirmBtn.textContent = `✅ Tasdiqlash — ${fmtPrice(grandTotal)} so'm`;
+  }
 }
 
 // ============================================================
