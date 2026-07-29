@@ -5,8 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Taomim</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://maps.googleapis.com/maps/api/js?v=3.exp"></script>
 <style>
 :root {
   --bg: #f5f6fa;
@@ -1050,43 +1049,58 @@ async function fetchDeliveryFee(items, customLat = null, customLon = null) {
   }
 }
 
-// Xarita va Marker o'zgaruvchilari
-let leafMap = null;
-let leafMarker = null;
+// Google Maps va Marker o'zgaruvchilari
+let gMap = null;
+let gMarker = null;
 
 function initDeliveryMap(lat, lon) {
   const container = document.getElementById('delivery-map');
   if (!container) return;
 
-  if (!leafMap) {
-    leafMap = L.map('delivery-map').setView([lat, lon], 15);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap'
-    }).addTo(leafMap);
+  if (window.google && window.google.maps) {
+    const pos = { lat: parseFloat(lat), lng: parseFloat(lon) };
+    if (!gMap) {
+      gMap = new google.maps.Map(container, {
+        center: pos,
+        zoom: 16,
+        disableDefaultUI: false,
+        zoomControl: true,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false
+      });
 
-    leafMarker = L.marker([lat, lon], { draggable: true }).addTo(leafMap);
+      gMarker = new google.maps.Marker({
+        position: pos,
+        map: gMap,
+        draggable: true,
+        animation: google.maps.Animation.DROP,
+        title: "Yetkazish manzili"
+      });
 
-    // Marker surilganda (dragend)
-    leafMarker.on('dragend', function (e) {
-      const pos = e.target.getLatLng();
-      onMapLocationSelected(pos.lat, pos.lng);
-    });
+      // Marker surilganda
+      gMarker.addListener('dragend', function (e) {
+        onMapLocationSelected(e.latLng.lat(), e.latLng.lng());
+      });
 
-    // Xaritaning istalgan joyiga bosilganda (click)
-    leafMap.on('click', function (e) {
-      leafMarker.setLatLng(e.latlng);
-      onMapLocationSelected(e.latlng.lat, e.latlng.lng);
-    });
+      // Xaritaning istalgan joyi bosilganda
+      gMap.addListener('click', function (e) {
+        gMarker.setPosition(e.latLng);
+        onMapLocationSelected(e.latLng.lat(), e.latLng.lng());
+      });
+    } else {
+      gMap.setCenter(pos);
+      gMarker.setPosition(pos);
+    }
   } else {
-    leafMap.setView([lat, lon], 15);
-    leafMarker.setLatLng([lat, lon]);
+    // Agar Google Maps yuklanayotgan bo'lsa qayta urinib ko'rish
+    setTimeout(() => initDeliveryMap(lat, lon), 500);
   }
 }
 
 function onMapLocationSelected(lat, lon) {
   userLocation = { lat, lon };
-  document.getElementById('location-name').textContent = 'Xaritadan tanlangan manzil';
+  document.getElementById('location-name').textContent = '📍 Xaritadan tanlangan manzil';
   document.getElementById('location-coords').textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
   tg.HapticFeedback.selectionChanged();
   showToast('📍 Manzil o\'zgartirildi, narx qayta hisoblanmoqda...');
@@ -1106,18 +1120,20 @@ function getCurrentGPSLocation() {
       const lon = pos.coords.longitude;
       userLocation = { lat, lon };
       
-      document.getElementById('location-name').textContent = '📍 Joriy joylashuvingiz (GPS)';
+      document.getElementById('location-name').textContent = '📍 Aniq joylashuvingiz (GPS)';
       document.getElementById('location-coords').textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
       
-      if (leafMap && leafMarker) {
-        leafMap.setView([lat, lon], 16);
-        leafMarker.setLatLng([lat, lon]);
+      if (gMap && gMarker) {
+        const newPos = { lat, lng: lon };
+        gMap.setCenter(newPos);
+        gMap.setZoom(17);
+        gMarker.setPosition(newPos);
       } else {
         initDeliveryMap(lat, lon);
       }
       
       tg.HapticFeedback.notificationOccurred('success');
-      showToast('📍 Joylashuvingiz aniqlandi!');
+      showToast('🎯 Joylashuvingiz bir martada aniq olindi!');
       
       // Narxni ANIQ va DARHOL qayta hisoblash
       const items = getCartItems();
@@ -1126,7 +1142,11 @@ function getCurrentGPSLocation() {
       console.error('GPS error:', err);
       showToast('⚠️ Joylashuvni aniqlab bo\'lmadi. Xaritadan tanlang.');
       if (btnStatus) btnStatus.textContent = '⚠️ GPS xatosi';
-    }, { enableHighAccuracy: true, timeout: 10000 });
+    }, { 
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0 
+    });
   } else {
     showToast('⚠️ Qurilmada GPS qo\'llab-quvvatlanmaydi.');
   }
