@@ -61,7 +61,7 @@ async def cmd_start(message: Message, state: FSMContext):
     logger.info(f"New user {telegram_id} started the bot. Initiating registration.")
     await message.answer(
         "Assalomu alaykum! 🍽️ **Taomim** — tez va mazali taom yetkazib berish xizmatiga xush kelibsiz!\n\n"
-        "⏱️ 24/7 ishlaydi  ·  🚴 Tez yetkazish\n\n"
+        "🚴 Tez yetkazish  ·  😋 Lazzatli taomlar\n\n"
         "Xizmatdan foydalanish uchun ro'yxatdan o'tishingiz lozim.\n"
         "Iltimos, **ism va familiyangizni** kiriting (masalan: Alisher Usmonov):",
         parse_mode="Markdown",
@@ -161,9 +161,8 @@ async def process_location(message: Message, state: FSMContext):
             f"🎉 Xush kelibsiz, {full_name}!\n\n"
             "✅ Ro'yxatdan o'tish muvaffaqiyatli yakunlandi!\n\n"
             "🍽️ Taomim orqali qulay buyurtma bering:\n"
-            "  • Ko'plab taom turlari\n"
-            "  • Tez yetkazish\n"
-            "  • 24/7 ishlaydi\n\n"
+            "  • Xilma-xil va lazzatli taomlar\n"
+            "  • Tez yetkazib berish\n\n"
             "Pastdagi tugmani bosib buyurtma bering:",
             reply_markup=inline_keyboard
         )
