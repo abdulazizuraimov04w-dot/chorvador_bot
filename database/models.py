@@ -193,7 +193,20 @@ async def create_tables():
         ALTER TABLE products ADD COLUMN IF NOT EXISTS restaurant_id INT REFERENCES restaurants(id) ON DELETE SET NULL;
     """)
 
-    logger.info("Tables checked/created successfully.")
+    # 11. reviews table
+    await execute_query("""
+        CREATE TABLE IF NOT EXISTS reviews (
+            id SERIAL PRIMARY KEY,
+            product_id INT REFERENCES products(id) ON DELETE CASCADE,
+            user_id INT REFERENCES users(id) ON DELETE CASCADE,
+            order_id INT REFERENCES orders(id) ON DELETE SET NULL,
+            rating SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+            comment TEXT DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT NOW(),
+            UNIQUE(product_id, user_id, order_id)
+        );
+    """)
+
 
     # Always upsert Taomim food categories (migration to food delivery)
     taomim_cats = [
@@ -1125,3 +1138,92 @@ async def update_order_courier(order_id: int, courier_id: int = None):
         "UPDATE orders SET courier_id = $1 WHERE id = $2;",
         courier_id, order_id
     )
+
+# ============================================================
+# REVIEW / RATING FUNCTIONS
+# ============================================================
+
+async def add_review(product_id: int, user_id: int, order_id: int,
+                     rating: int, comment: str = None) -> Optional[Dict[str, Any]]:
+    """Yangi baho qo'shish. Agar avval bahogan bo'lsa — yangilaydi."""
+    row = await fetch_row("""
+        INSERT INTO reviews (product_id, user_id, order_id, rating, comment)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (product_id, user_id, order_id) DO UPDATE
+            SET rating = EXCLUDED.rating,
+                comment = EXCLUDED.comment,
+                created_at = NOW()
+        RETURNING *;
+    """, product_id, user_id, order_id, rating, comment)
+    return dict(row) if row else None
+
+async def get_product_rating(product_id: int) -> Dict[str, Any]:
+    """Mahsulot o'rtacha reytingi va baholar soni."""
+    row = await fetch_row("""
+        SELECT
+            ROUND(AVG(rating)::numeric, 1)  AS avg_rating,
+            COUNT(*)                         AS total_reviews
+        FROM reviews
+        WHERE product_id = $1;
+    """, product_id)
+    if row:
+        return {
+            'avg_rating':    float(row['avg_rating']) if row['avg_rating'] else 0.0,
+            'total_reviews': int(row['total_reviews'])
+        }
+    return {'avg_rating': 0.0, 'total_reviews': 0}
+
+async def get_product_reviews(product_id: int, limit: int = 5) -> List[Dict[str, Any]]:
+    """Mahsulotning so'nggi sharhlari."""
+    rows = await fetch_rows("""
+        SELECT r.rating, r.comment, r.created_at,
+               u.full_name
+        FROM reviews r
+        JOIN users u ON u.id = r.user_id
+        WHERE r.product_id = $1
+          AND r.comment IS NOT NULL
+          AND TRIM(r.comment) != ''
+        ORDER BY r.created_at DESC
+        LIMIT $2;
+    """, product_id, limit)
+    return [dict(row) for row in rows]
+
+async def get_all_product_ratings() -> Dict[int, Dict]:
+    """Barcha mahsulotlarning reytinglari (bir so'rovda)."""
+    rows = await fetch_rows("""
+        SELECT
+            product_id,
+            ROUND(AVG(rating)::numeric, 1) AS avg_rating,
+            COUNT(*)                        AS total_reviews
+        FROM reviews
+        GROUP BY product_id;
+    """)
+    return {
+        row['product_id']: {
+            'avg_rating':    float(row['avg_rating']),
+            'total_reviews': int(row['total_reviews'])
+        }
+        for row in rows
+    }
+
+async def has_user_reviewed(product_id: int, user_id: int, order_id: int) -> bool:
+    """Foydalanuvchi bu mahsulotni bu buyurtmada bahoganlimi?"""
+    val = await fetch_val(
+        "SELECT 1 FROM reviews WHERE product_id=$1 AND user_id=$2 AND order_id=$3;",
+        product_id, user_id, order_id
+    )
+    return val is not None
+
+async def get_order_products_for_review(order_id: int) -> List[Dict[str, Any]]:
+    """Buyurtmadagi mahsulotlar ro'yxati (baholash uchun)."""
+    rows = await fetch_rows("""
+        SELECT oi.product_id, p.name, oi.quantity
+        FROM order_items oi
+        JOIN products p ON p.id = oi.product_id
+        WHERE oi.order_id = $1;
+    """, order_id)
+    return [dict(row) for row in rows]
+
+async def get_user_id_by_telegram_id(telegram_id: int) -> Optional[int]:
+    """telegram_id dan user.id ni olish."""
+    return await fetch_val("SELECT id FROM users WHERE telegram_id = $1;", telegram_id)

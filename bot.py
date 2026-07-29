@@ -9,6 +9,8 @@ from database.connection import init_db_pool, close_db_pool
 from database.models import create_tables
 from database import models
 from handlers import registration, menu, order, admin
+from handlers import review as review_handler
+from handlers.review import send_review_request
 from utils.logger import logger
 from utils.scheduler import scheduler_loop
 
@@ -73,6 +75,7 @@ async def on_shutdown(bot: Bot):
 def register_routers(dp: Dispatcher):
     dp.include_router(registration.router)
     dp.include_router(admin.router)
+    dp.include_router(review_handler.router)
     dp.include_router(menu.router)
     dp.include_router(order.router)
 
@@ -145,7 +148,7 @@ async def api_update_order_status(request):
         # Foydalanuvchini xabardor qil
         notify_map = {
             "confirmed": f"✅ #{order_id}-buyurtmangiz tasdiqlandi!",
-            "completed": f"🚚 #{order_id}-buyurtmangiz yetkazildi!\nYoqimli ishtaha!",
+            "completed": f"🚚 #{order_id}-buyurtmangiz yetkazildi!\nYoqimli ishtaha! 😊",
             "cancelled": f"❌ #{order_id}-buyurtmangiz bekor qilindi."
         }
         msg = notify_map.get(new_status)
@@ -154,6 +157,13 @@ async def api_update_order_status(request):
                 await bot.send_message(chat_id=db_order['telegram_id'], text=msg)
             except Exception as err:
                 logger.warning(f"Xabar yuborishda xato {db_order['telegram_id']}: {err}")
+
+        # Buyurtma yakunlanganda — baholash so'rovi yuborish
+        if new_status == "completed":
+            try:
+                await send_review_request(bot, db_order['telegram_id'], order_id)
+            except Exception as rev_err:
+                logger.warning(f"Review so'rovi xatosi: {rev_err}")
 
         return web.json_response({"success": True})
     except Exception as e:
@@ -190,17 +200,62 @@ async def api_get_products(request):
     try:
         from database import models
         products = await models.get_all_products()
+        ratings = await models.get_all_product_ratings()
         for p in products:
             p['price'] = float(p['price'])
             if p.get('created_at'):
                 p['created_at'] = p['created_at'].strftime("%Y-%m-%d %H:%M")
+            r = ratings.get(p['id'], {'avg_rating': 0.0, 'total_reviews': 0})
+            p['avg_rating']    = r['avg_rating']
+            p['total_reviews'] = r['total_reviews']
         return web.json_response(products)
     except Exception as e:
         logger.error(f"api_get_products: {e}")
         return web.json_response({"error": str(e)}, status=500)
 
+# Miniapp uchun ochiq products endpoint (token shart emas)
+async def api_miniapp_products(request):
+    """Miniapp uchun — reyting va tavsif bilan mahsulotlar."""
+    try:
+        from database import models
+        products = await models.get_all_products()
+        ratings  = await models.get_all_product_ratings()
+        result = []
+        for p in products:
+            if not p.get('is_active', True):
+                continue
+            r = ratings.get(p['id'], {'avg_rating': 0.0, 'total_reviews': 0})
+            result.append({
+                'id':            p['id'],
+                'name':          p['name'],
+                'price':         float(p['price']),
+                'image_url':     p.get('image_url'),
+                'category_id':   p.get('category_id'),
+                'category_icon': p.get('category_icon'),
+                'restaurant_id': p.get('restaurant_id'),
+                'restaurant_name': p.get('restaurant_name'),
+                'description':   p.get('description'),
+                'avg_rating':    r['avg_rating'],
+                'total_reviews': r['total_reviews'],
+            })
+        return web.json_response(result)
+    except Exception as e:
+        logger.error(f"api_miniapp_products: {e}")
+        return web.json_response({"error": str(e)}, status=500)
 
-
+async def api_get_product_reviews(request):
+    """Mahsulot sharhlari — miniapp modal uchun."""
+    try:
+        from database import models
+        product_id = int(request.match_info['id'])
+        reviews = await models.get_product_reviews(product_id, limit=5)
+        for r in reviews:
+            if r.get('created_at'):
+                r['created_at'] = r['created_at'].strftime("%Y-%m-%d")
+        return web.json_response(reviews)
+    except Exception as e:
+        logger.error(f"api_get_product_reviews: {e}")
+        return web.json_response({"error": str(e)}, status=500)
 
 
 # --- CATEGORY API ENDPOINTS ---
@@ -1259,6 +1314,10 @@ async def start_web_server():
     app.router.add_post('/api/products', api_add_product)
     app.router.add_put('/api/products/{id}', api_update_product)
     app.router.add_post('/api/products/{id}/toggle', api_toggle_product)
+
+    # Miniapp — products with ratings (no auth)
+    app.router.add_get('/api/miniapp/products', api_miniapp_products)
+    app.router.add_get('/api/miniapp/products/{id}/reviews', api_get_product_reviews)
 
     # Customers
     app.router.add_get('/api/customers', api_get_customers)
