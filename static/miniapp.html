@@ -367,41 +367,25 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
     <div class="topnav-title">🛒 Savatcha</div>
     <div></div>
   </div>
-  <!-- DELIVERY FEE INFO (shown when cart is not empty) -->
-  <div id="cart-delivery-box" style="display:none;margin:12px 16px 4px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;">
-    <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;">
-      <span>🚴 Yetkazib berish</span>
-      <span id="delivery-fee-label" style="color:var(--accent)">Hisoblanmoqda...</span>
-    </div>
-  </div>
-  <div id="cart-content"></div>
-  <button class="main-btn" id="cart-order-btn" onclick="goPage('order')">Buyurtma berish →</button>
-</div>
+  
+  <div style="padding-bottom:100px;overflow-y:auto;max-height:calc(100vh - 60px);">
+    <div id="cart-content"></div>
 
-<!-- ORDER PAGE -->
-<div class="page" id="page-order">
-  <div class="topnav">
-    <button class="topnav-back" onclick="goPage('cart')">←</button>
-    <div class="topnav-title">📋 Buyurtmani rasmiylashtirish</div>
-    <div></div>
-  </div>
-  <div class="order-form" style="padding-bottom:100px;">
-    
-    <!-- 📍 STEP 1: LOCATION & MAP -->
-    <div class="form-section">
-      <div class="form-section-title" style="display:flex;justify-content:space-between;align-items:center;">
-        <span>📍 1. Yetkazish manzili</span>
+    <!-- 📍 LOCATION & MAP SECTION IN CART -->
+    <div id="cart-delivery-box" style="display:none;margin:12px 16px 20px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;">
+      <div style="font-weight:700;font-size:14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+        <span>📍 Yetkazish manzili</span>
         <span style="font-size:11px;color:var(--accent-dark);font-weight:600;" id="delivery-calc-status">⚡ Real-vaqt hisoblanmoqda</span>
       </div>
 
-      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px;">
-        <button type="button" onclick="getCurrentGPSLocation()" style="display:flex;align-items:center;justify-content:center;gap:8px;background:var(--accent);color:#fff;border:none;padding:12px 16px;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;width:100%;box-shadow:0 3px 10px rgba(46,204,113,0.3);">
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;">
+        <button type="button" onclick="getCurrentGPSLocation()" style="display:flex;align-items:center;justify-content:center;gap:8px;background:var(--accent);color:#fff;border:none;padding:12px 14px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;width:100%;box-shadow:0 3px 8px rgba(46,204,113,0.3);">
           📍 Joylashuvimni ulashish (GPS)
         </button>
         <div style="font-size:11px;color:var(--muted);text-align:center;">yoki xaritaning ustiga bosib belgilang 👇</div>
       </div>
 
-      <div id="delivery-map" style="width:100%;height:200px;border-radius:12px;border:1px solid var(--border);margin-bottom:10px;z-index:1;"></div>
+      <div id="delivery-map" style="width:100%;height:180px;border-radius:10px;border:1px solid var(--border);margin-bottom:10px;z-index:1;"></div>
 
       <div class="location-box" style="margin-top:6px;">
         <div class="location-icon">📌</div>
@@ -411,10 +395,23 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- 💳 STEP 2: PAYMENT METHOD -->
+  <button class="main-btn" id="cart-order-btn" onclick="goPage('order')">Buyurtma berish →</button>
+</div>
+
+<!-- ORDER PAGE (CONFIRMATION & PAYMENT) -->
+<div class="page" id="page-order">
+  <div class="topnav">
+    <button class="topnav-back" onclick="goPage('cart')">←</button>
+    <div class="topnav-title">📋 Buyurtmani tasdiqlash</div>
+    <div></div>
+  </div>
+  <div class="order-form" style="padding-bottom:100px;">
+    
+    <!-- 💳 PAYMENT METHOD -->
     <div class="form-section">
-      <div class="form-section-title">💳 2. To'lov usuli</div>
+      <div class="form-section-title">💳 To'lov usulini tanlang</div>
       <div class="modal-pay-grid" style="margin-top:4px;">
         <div class="modal-pay-card selected" id="order-pay-cash" onclick="selectPayMethod('cash')">
           <div class="modal-pay-icon">💵</div>
@@ -427,9 +424,9 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
       </div>
     </div>
 
-    <!-- 🧾 STEP 3: SUMMARY -->
+    <!-- 🧾 SUMMARY -->
     <div class="form-section">
-      <div class="form-section-title">🧾 3. Buyurtma hisob-kitobi</div>
+      <div class="form-section-title">🧾 Buyurtma yakuniy hisob-kitobi</div>
       <div class="order-items-preview" id="order-preview"></div>
     </div>
 
@@ -980,17 +977,29 @@ function renderCart() {
     <div class="cart-summary">
       ${items.map(i => `<div class="summary-row"><span>${esc(i.name)} × ${i.quantity}</span><span>${fmtPrice(i.subtotal)} so'm</span></div>`).join('')}
       <div class="summary-row" id="delivery-summary-row" style="color:var(--muted)">
-        <span>🚴 Yetkazish</span><span id="delivery-summary-val">Hisoblanmoqda...</span>
+        <span>🚴 Yetkazib berish</span><span id="delivery-summary-val" style="font-weight:700;color:var(--accent-dark);">Hisoblanmoqda...</span>
       </div>
       <div class="summary-row total"><span>Jami</span><span class="val" id="cart-total-val">${fmtPrice(total)} so'm</span></div>
     </div>`;
 
   btn.disabled = false;
-  btn.textContent = `Buyurtma berish → ${fmtPrice(total)} so'm`;
 
-  // Delivery fee hisoblash
-  if (delivBox) delivBox.style.display = 'flex';
-  fetchDeliveryFee(items);
+  // Delivery boxni ko'rsatish va Xaritaning koordinatasini tayyorlash
+  if (delivBox) delivBox.style.display = 'block';
+
+  let startLat = userLocation?.lat || 41.31108;
+  let startLon = userLocation?.lon || 69.24056;
+
+  document.getElementById('location-coords').textContent = `${startLat.toFixed(5)}, ${startLon.toFixed(5)}`;
+
+  // Xaritani ishga tushirish
+  setTimeout(() => {
+    initDeliveryMap(startLat, startLon);
+    if (leafMap) leafMap.invalidateSize();
+  }, 100);
+
+  // Delivery fee va Jami summani hisoblash
+  fetchDeliveryFee(items, startLat, startLon);
 }
 function changeQtyCart(id, delta) { changeQty(id, delta); renderCart(); }
 
@@ -1150,6 +1159,17 @@ function renderOrderPreviewOnly() {
   const total = items.reduce((s,i) => s + i.subtotal, 0);
   const grandTotal = total + (deliveryFeeAmount || 0);
 
+  // Savatchadagi total va tugmani yangilash
+  const cartTotalEl = document.getElementById('cart-total-val');
+  const cartBtn     = document.getElementById('cart-order-btn');
+  const summaryVal  = document.getElementById('delivery-summary-val');
+
+  const feeText = deliveryFeeAmount > 0 ? `${fmtPrice(deliveryFeeAmount)} so'm` : 'Bepul / Hisoblanmoqda...';
+  if (summaryVal) summaryVal.textContent = feeText;
+  if (cartTotalEl) cartTotalEl.textContent = `${fmtPrice(grandTotal)} so'm`;
+  if (cartBtn && !cartBtn.disabled) cartBtn.textContent = `Buyurtma berish → ${fmtPrice(grandTotal)} so'm`;
+
+  // Buyurtmani tasdiqlash sahifasi preview elementlarini yangilash
   const preview = document.getElementById('order-preview');
   if (preview) {
     preview.innerHTML = items.length
@@ -1159,7 +1179,7 @@ function renderOrderPreviewOnly() {
             <span>${fmtPrice(i.subtotal)} so'm</span>
           </div>`).join('') +
         `<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--muted);padding:6px 0;border-top:1px dashed var(--border);margin-top:6px;">
-          <span>🚴 Yetkazib berish</span><span style="font-weight:700;color:var(--accent-dark);">${deliveryFeeAmount > 0 ? fmtPrice(deliveryFeeAmount) + " so'm" : 'Bepul / Hisoblanmoqda...'}</span>
+          <span>🚴 Yetkazib berish</span><span style="font-weight:700;color:var(--accent-dark);">${feeText}</span>
          </div>
          <div class="order-preview-total"><span>Jami to'lov</span><span class="val" style="color:var(--accent-dark);font-size:18px;">${fmtPrice(grandTotal)} so'm</span></div>`
       : '<div style="color:var(--muted);font-size:13px;">Savat bo\'sh</div>';
