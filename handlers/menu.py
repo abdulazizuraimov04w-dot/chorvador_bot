@@ -14,45 +14,52 @@ router = Router(name="menu")
 MINIAPP_URL = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/") + "/miniapp"
 ADMIN_PHONE = "+998900009615"
 
-@router.message(F.text == "🛒 Buyurtma berish")
+@router.message(F.text & F.text.contains("Buyurtma berish"))
 async def cmd_open_miniapp(message: Message):
-    user = await models.get_user_by_telegram_id(message.from_user.id)
-    if not user:
-        await message.answer("Siz ro'yxatdan o'tmagansiz. /start bosing.")
-        return
+    try:
+        user = await models.get_user_by_telegram_id(message.from_user.id)
+        if not user:
+            await message.answer("Siz ro'yxatdan o'tmagansiz. Iltimos /start bosing.")
+            return
 
-    loyalty = await models.get_user_loyalty_info(message.from_user.id)
-    bar_str = loyalty.get('progress_bar', '⬜'*10)
-    current = loyalty.get('current_step', 0)
-    target  = loyalty.get('target', 10)
-    rem     = loyalty.get('remaining', 10)
-    min_amt = int(loyalty.get('min_amount', 70000))
+        loyalty_banner = ""
+        try:
+            loyalty = await models.get_user_loyalty_info(message.from_user.id)
+            bar_str = loyalty.get('progress_bar', '⬜'*10)
+            current = loyalty.get('current_step', 0)
+            target  = loyalty.get('target', 10)
+            rem     = loyalty.get('remaining', 10)
 
-    if loyalty.get('is_gift_order'):
-        loyalty_banner = f"🎁 **10-YUBILEY SOVG'ANGIZ SIZNI KUTMOQDA!**\n[ {bar_str} ] {target}/{target}"
-    elif rem == 1:
-        loyalty_banner = f"🔥 **JUDA YA QINS IZ!** Yana 1 ta buyurtma bersangiz SOVG'A olasiz!\n[ {bar_str} ] {current}/{target}"
-    else:
-        loyalty_banner = f"🎁 **Sovg'aga {rem} ta buyurtma qoldi!**\n[ {bar_str} ] {current}/{target}"
+            if loyalty.get('is_gift_order'):
+                loyalty_banner = f"🎁 **10-YUBILEY SOVG'ANGIZ SIZNI KUTMOQDA!**\n[ {bar_str} ] {target}/{target}\n\n"
+            elif rem == 1:
+                loyalty_banner = f"🔥 **JUDA YAQINSIZ!** Yana 1 ta buyurtma bersangiz SOVG'A olasiz!\n[ {bar_str} ] {current}/{target}\n\n"
+            else:
+                loyalty_banner = f"🎁 **Sovg'aga {rem} ta buyurtma qoldi!**\n[ {bar_str} ] {current}/{target}\n\n"
+        except Exception as le:
+            logger.error(f"Loyalty info error: {le}")
 
-    # MiniApp URL tekshirish – agar to‘g‘ri http(s) URL bo‘lmasa, oddiy matn yuborish
-    if not MINIAPP_URL.startswith('http'):
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="🍽️ Taom buyurtma berish", web_app=WebAppInfo(url=MINIAPP_URL))
+        ]])
+
         await message.answer(
-            "⚠️ Miniapp hozircha ishlamaydi. Iltimos, keyinroq qayta urinib ko‘ring.",
+            f"🍽️ **Taomim — Hamkor oshxonalardan tez va mazali taomlar!** 🚀\n\n"
+            f"{loyalty_banner}"
+            f"Buyurtma berish uchun quyidagi tugmani bosing:",
+            reply_markup=keyboard,
             parse_mode="Markdown"
         )
-        return
-
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="🛒 Buyurtma berish", web_app=WebAppInfo(url=MINIAPP_URL))
-    ]])
-    await message.answer(
-        f"🍊 **Mandarin Supermarket Katalogi**\n\n"
-        f"{loyalty_banner}\n"
-        f"💡 *Minimal buyurtma summasi:* {min_amt:,} so'm\n\n"
-        f"Buyurtma berish uchun quyidagi '🛒 Buyurtma berish' tugmasini bosing:",
-        reply_markup=keyboard, parse_mode="Markdown"
-    )
+    except Exception as e:
+        logger.error(f"cmd_open_miniapp error: {e}")
+        # Xatolik yuz berganda ham minimal tugma bilan javob qaytarish
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="🍽️ Taom buyurtma berish", web_app=WebAppInfo(url=MINIAPP_URL))
+        ]])
+        await message.answer(
+            "🍽️ Buyurtma berish uchun pastdagi tugmani bosing:",
+            reply_markup=keyboard
+        )
 
 @router.message(F.text == "👤 Profilim")
 async def cmd_profile(message: Message):
