@@ -60,6 +60,10 @@ async def create_tables():
     await execute_query("""
         ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT NULL;
         ALTER TABLE products ADD COLUMN IF NOT EXISTS category_id INT REFERENCES categories(id) ON DELETE SET NULL;
+        ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT DEFAULT NULL;
+    """)
+    await execute_query("""
+        ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method VARCHAR(20) DEFAULT 'cash';
     """)
     
     # 4. orders table
@@ -662,10 +666,11 @@ async def update_product_price(product_id: int, new_price: Decimal):
     await execute_query("UPDATE products SET price = $1 WHERE id = $2;", new_price, product_id)
 
 async def add_product(name: str, price: Decimal, image_url: str = None,
-                      category_id: int = None, restaurant_id: int = None) -> Dict[str, Any]:
+                      category_id: int = None, restaurant_id: int = None,
+                      description: str = None) -> Dict[str, Any]:
     row = await fetch_row(
-        "INSERT INTO products (name, price, image_url, category_id, restaurant_id) VALUES ($1, $2, $3, $4, $5) RETURNING *;",
-        name, price, image_url, category_id, restaurant_id
+        "INSERT INTO products (name, price, image_url, category_id, restaurant_id, description) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;",
+        name, price, image_url, category_id, restaurant_id, description
     )
     return dict(row)
 
@@ -681,7 +686,8 @@ async def update_product_image(product_id: int, image_url: str) -> Optional[Dict
 
 async def update_product(product_id: int, name: str = None, price: Decimal = None,
                          image_url: str = None, category_id: int = None,
-                         restaurant_id: int = None) -> Optional[Dict[str, Any]]:
+                         restaurant_id: int = None,
+                         description: str = None) -> Optional[Dict[str, Any]]:
     fields = []
     values = []
     idx = 1
@@ -695,6 +701,8 @@ async def update_product(product_id: int, name: str = None, price: Decimal = Non
         fields.append(f"category_id = ${idx}"); values.append(category_id); idx += 1
     if restaurant_id is not None:
         fields.append(f"restaurant_id = ${idx}"); values.append(restaurant_id); idx += 1
+    if description is not None:
+        fields.append(f"description = ${idx}"); values.append(description); idx += 1
 
     if not fields:
         return await get_product_by_id(product_id)

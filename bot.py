@@ -270,16 +270,17 @@ async def api_add_product(request):
     try:
         from decimal import Decimal
         data = await request.json()
-        name = data.get("name", "").strip()
-        price = data.get("price")
-        image_url = data.get("image_url")
-        category_id = data.get("category_id")
-        restaurant_id = data.get("restaurant_id")
+        name         = data.get("name", "").strip()
+        price        = data.get("price")
+        image_url    = data.get("image_url")
+        category_id  = data.get("category_id")
+        restaurant_id= data.get("restaurant_id")
+        description  = data.get("description", "").strip() or None
         if not name or price is None:
             return web.json_response({"error": "Nom va narx kiritilishi shart!"}, status=400)
-        cat_id  = int(category_id)  if category_id  else None
+        cat_id  = int(category_id)   if category_id   else None
         rest_id = int(restaurant_id) if restaurant_id else None
-        product = await models.add_product(name, Decimal(str(price)), image_url, cat_id, rest_id)
+        product = await models.add_product(name, Decimal(str(price)), image_url, cat_id, rest_id, description)
         product['price'] = float(product['price'])
         if product.get('created_at'):
             product['created_at'] = product['created_at'].strftime("%Y-%m-%d %H:%M")
@@ -294,19 +295,20 @@ async def api_update_product(request):
         return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
     try:
         from decimal import Decimal
-        product_id = int(request.match_info['id'])
-        data = await request.json()
-        name = data.get("name", "").strip()
-        price = data.get("price")
-        image_url = data.get("image_url")
-        category_id = data.get("category_id")
-        restaurant_id = data.get("restaurant_id")
+        product_id   = int(request.match_info['id'])
+        data         = await request.json()
+        name         = data.get("name", "").strip()
+        price        = data.get("price")
+        image_url    = data.get("image_url")
+        category_id  = data.get("category_id")
+        restaurant_id= data.get("restaurant_id")
+        description  = data.get("description", "").strip() or None
         if not name or price is None:
             return web.json_response({"error": "Nom va narx kiritilishi shart!"}, status=400)
-        cat_id  = int(category_id)  if category_id  else None
+        cat_id  = int(category_id)   if category_id   else None
         rest_id = int(restaurant_id) if restaurant_id else None
-        await models.update_product(product_id, name, Decimal(str(price)), image_url, cat_id, rest_id)
-        logger.info(f"Mahsulot #{product_id} yangilandi: {name}, {price}")
+        await models.update_product(product_id, name, Decimal(str(price)), image_url, cat_id, rest_id, description)
+        logger.info(f"Mahsulot #{product_id} yangilandi: {name}")
         return web.json_response({"success": True})
     except Exception as e:
         logger.error(f"api_update_product: {e}")
@@ -613,14 +615,15 @@ async def api_miniapp_order(request):
         from database import models
         data = await request.json()
 
-        telegram_id = data.get("telegram_id")
-        items = data.get("items", [])
-        total_price = data.get("total_price", 0)
-        delivery_date_str = data.get("delivery_date")
-        delivery_time_start = data.get("delivery_time_start", "06:00")
-        delivery_time_end = data.get("delivery_time_end", "07:00")
-        new_lat = data.get("latitude")
-        new_lon = data.get("longitude")
+        telegram_id         = data.get("telegram_id")
+        items               = data.get("items", [])
+        total_price         = data.get("total_price", 0)
+        delivery_date_str   = data.get("delivery_date")
+        delivery_time_start = data.get("delivery_time_start", "09:00")
+        delivery_time_end   = data.get("delivery_time_end", "23:00")
+        new_lat             = data.get("latitude")
+        new_lon             = data.get("longitude")
+        payment_method      = data.get("payment_method", "cash")  # 'cash' yoki 'click'
 
         if not telegram_id or not items:
             return web.json_response({"error": "Ma'lumotlar to'liq emas!"}, status=400)
@@ -703,7 +706,8 @@ async def api_miniapp_order(request):
 
             courier_info = f"**Kuryer:** {courier_name}\n" if courier_name else ""
             mfy_info = f"**Mahalla (MFY):** {mfy_name} MFY\n" if mfy_name else ""
-
+            pay_icon = "💵" if payment_method == "cash" else "🔵"
+            pay_label = "Kelganda to'lanadi" if payment_method == "cash" else "Click orqali"
             admin_text = (
                 f"🔔 *YANGI BUYURTMA (Mini App)*\n\n"
                 f"*Buyurtma:* #{order_id}\n"
@@ -711,9 +715,9 @@ async def api_miniapp_order(request):
                 f"*Telefon:* {user['phone_number']}\n"
                 f"{mfy_info}"
                 f"{courier_info}"
-                f"*Yetkazish:* {delivery_date} | {delivery_time_start}–{delivery_time_end}\n\n"
                 f"*Mahsulotlar:*\n{items_text}"
-                f"💵 *Jami:* {int(total_price):,} so'm\n\n"
+                f"{pay_icon} *To'lov:* {pay_label}\n"
+                f"💰 *Jami:* {int(total_price):,} so'm\n\n"
                 f"_Web Panelda ko'rish mumkin!_"
             ).replace(",", " ")
 
