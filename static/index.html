@@ -1664,6 +1664,9 @@ function renderProducts() {
     const imgHtml = p.image_url 
       ? `<img src="${esc(p.image_url)}" style="width:100%;height:120px;object-fit:cover;border-radius:8px;margin-bottom:8px;" onerror="this.outerHTML='<div style=\\'width:100%;height:120px;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--surface2);border-radius:8px;margin-bottom:8px;\\'>${getEmoji(p.name)}</div>'">`
       : `<div style="width:100%;height:120px;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--surface2);border-radius:8px;margin-bottom:8px;">${getEmoji(p.name)}</div>`;
+    const ratingHtml = (p.avg_rating > 0)
+      ? `<div style="font-size:11px;color:#f39c12;font-weight:700;margin-top:2px;">⭐ ${Number(p.avg_rating).toFixed(1)} <span style="color:var(--muted);font-weight:400;">(${p.total_reviews} ta baho)</span></div>`
+      : '';
     return `
       <div class="product-card">
         ${imgHtml}
@@ -1671,6 +1674,7 @@ function renderProducts() {
         ${p.restaurant_name ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">🏪 ${esc(p.restaurant_name)}</div>` : ''}
         ${p.category_name ? `<div style="font-size:11px;color:var(--muted);">${p.category_icon||''} ${esc(p.category_name)}</div>` : ''}
         <div class="product-price">${fmtMoney(p.price)} <small>so'm</small></div>
+        ${ratingHtml}
         <div class="product-status" style="margin-top:10px;display:flex;align-items:center;gap:6px;">
           <label class="toggle-switch">
             <input type="checkbox" ${p.is_active ? 'checked' : ''} onchange="toggleProduct(${p.id}, this.checked)">
