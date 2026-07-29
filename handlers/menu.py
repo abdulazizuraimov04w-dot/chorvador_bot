@@ -44,9 +44,9 @@ async def cmd_open_miniapp(message: Message):
         ]])
 
         await message.answer(
-            f"🍽️ **Taomim — Hamkor oshxonalardan tez va mazali taomlar!** 🚀\n\n"
+            f"🍽️ **Taomim — Mazali va tansiq taomlar siz uchun!** 🚀\n\n"
             f"{loyalty_banner}"
-            f"Buyurtma berish uchun quyidagi tugmani bosing:",
+            f"O'zingizga yoqqan lazzatli taomlarni buyurtma qilish uchun pastdagi tugmani bosing 👇",
             reply_markup=keyboard,
             parse_mode="Markdown"
         )
