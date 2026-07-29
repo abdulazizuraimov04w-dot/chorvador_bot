@@ -2,8 +2,9 @@
 Review handler — mahsulotlarni baholash va sharh yozish.
 Buyurtma "yakunlandi" bo'lganda bot yulduz tugmalarini yuboradi.
 """
+import os
 from aiogram import Router, F
-from aiogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiogram.fsm.context import FSMContext
 
 from database import models
@@ -13,6 +14,18 @@ from utils.logger import logger
 router = Router(name="review")
 
 STARS = {1: "⭐", 2: "⭐⭐", 3: "⭐⭐⭐", 4: "⭐⭐⭐⭐", 5: "⭐⭐⭐⭐⭐"}
+
+MINIAPP_URL = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/") + "/miniapp"
+
+
+def miniapp_keyboard() -> InlineKeyboardMarkup:
+    """Miniappga o'tish tugmasi."""
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text="🛒 Buyurtma berish",
+            web_app=WebAppInfo(url=MINIAPP_URL)
+        )
+    ]])
 
 
 def rating_keyboard(order_id: int, product_id: int) -> InlineKeyboardMarkup:
@@ -68,7 +81,6 @@ async def handle_rating(callback: CallbackQuery, state: FSMContext):
         await callback.answer("Foydalanuvchi topilmadi.", show_alert=True)
         return
 
-    # Reytingni vaqtincha FSM ga saqlaymiz (sharh kutamiz)
     await state.set_state(ReviewStates.waiting_for_comment)
     await state.update_data(
         review_order_id=order_id,
@@ -91,10 +103,10 @@ async def handle_rating(callback: CallbackQuery, state: FSMContext):
 @router.message(ReviewStates.waiting_for_comment)
 async def handle_review_comment(message: Message, state: FSMContext):
     data = await state.get_data()
-    order_id    = data.get("review_order_id")
-    product_id  = data.get("review_product_id")
-    rating      = data.get("review_rating")
-    user_id     = data.get("review_user_id")
+    order_id   = data.get("review_order_id")
+    product_id = data.get("review_product_id")
+    rating     = data.get("review_rating")
+    user_id    = data.get("review_user_id")
 
     comment = message.text.strip() if message.text else None
 
@@ -102,12 +114,17 @@ async def handle_review_comment(message: Message, state: FSMContext):
         await models.add_review(product_id, user_id, order_id, rating, comment)
         stars_str = STARS.get(rating, "⭐")
         await message.answer(
-            f"✅ Rahmat! *{stars_str}* bahoyingiz saqlandi!",
-            parse_mode="Markdown"
+            f"✅ Rahmat! *{stars_str}* bahoyingiz saqlandi!\n\n"
+            f"🛒 Yana buyurtma bermoqchimisiz? Pastdagi tugmani bosing 👇",
+            parse_mode="Markdown",
+            reply_markup=miniapp_keyboard()
         )
     except Exception as e:
         logger.error(f"handle_review_comment: {e}")
-        await message.answer("Xatolik yuz berdi. Keyinroq urinib ko'ring.")
+        await message.answer(
+            "Xatolik yuz berdi. Keyinroq urinib ko'ring.",
+            reply_markup=miniapp_keyboard()
+        )
 
     await state.clear()
 
@@ -123,11 +140,14 @@ async def handle_skip_review(callback: CallbackQuery, state: FSMContext):
 
     if order_id and product_id and rating and user_id:
         try:
-            # Sharh yo'q, faqat reyting saqlanadi
             await models.add_review(product_id, user_id, order_id, rating, None)
         except Exception as e:
             logger.error(f"handle_skip_review save: {e}")
 
-    await callback.message.edit_text("✅ Bahoyingiz saqlandi! Rahmat.")
+    await callback.message.edit_text(
+        "✅ Bahoyingiz saqlandi! Rahmat.\n\n"
+        "🛒 Yana buyurtma bermoqchimisiz? Pastdagi tugmani bosing 👇",
+        reply_markup=miniapp_keyboard()
+    )
     await state.clear()
     await callback.answer()
