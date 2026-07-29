@@ -35,13 +35,21 @@ async def cmd_open_miniapp(message: Message):
     else:
         loyalty_banner = f"🎁 **Sovg'aga {rem} ta buyurtma qoldi!**\n[ {bar_str} ] {current}/{target}"
 
+    # MiniApp URL tekshirish – agar to‘g‘ri http(s) URL bo‘lmasa, oddiy matn yuborish
+    if not MINIAPP_URL.startswith('http'):
+        await message.answer(
+            "⚠️ Miniapp hozircha ishlamaydi. Iltimos, keyinroq qayta urinib ko‘ring.",
+            parse_mode="Markdown"
+        )
+        return
+
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="🛒 Buyurtma berish", web_app=WebAppInfo(url=MINIAPP_URL))
     ]])
     await message.answer(
         f"🍊 **Mandarin Supermarket Katalogi**\n\n"
         f"{loyalty_banner}\n"
-        f"💡 *Minimal buyurtma summasi:* {min_amt:,} so'm\n\n".replace(",", " ") +
+        f"💡 *Minimal buyurtma summasi:* {min_amt:,} so'm\n\n"
         f"Buyurtma berish uchun quyidagi '🛒 Buyurtma berish' tugmasini bosing:",
         reply_markup=keyboard, parse_mode="Markdown"
     )
