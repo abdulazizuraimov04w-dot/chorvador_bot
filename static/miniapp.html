@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Taomim</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="https://maps.googleapis.com/maps/api/js?v=3.exp"></script>
+<script src="https://api-maps.yandex.ru/2.1/?lang=uz_UZ" type="text/javascript"></script>
 <style>
 :root {
   --bg: #f5f6fa;
@@ -1049,53 +1049,63 @@ async function fetchDeliveryFee(items, customLat = null, customLon = null) {
   }
 }
 
-// Google Maps va Marker o'zgaruvchilari
-let gMap = null;
-let gMarker = null;
+// Yandex Maps va Marker o'zgaruvchilari
+let yMap = null;
+let yMarker = null;
 
 function initDeliveryMap(lat, lon) {
   const container = document.getElementById('delivery-map');
   if (!container) return;
 
-  if (window.google && window.google.maps) {
-    const pos = { lat: parseFloat(lat), lng: parseFloat(lon) };
-    if (!gMap) {
-      gMap = new google.maps.Map(container, {
-        center: pos,
-        zoom: 16,
-        disableDefaultUI: false,
-        zoomControl: true,
-        mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: false
-      });
-
-      gMarker = new google.maps.Marker({
-        position: pos,
-        map: gMap,
-        draggable: true,
-        animation: google.maps.Animation.DROP,
-        title: "Yetkazish manzili"
-      });
-
-      // Marker surilganda
-      gMarker.addListener('dragend', function (e) {
-        onMapLocationSelected(e.latLng.lat(), e.latLng.lng());
-      });
-
-      // Xaritaning istalgan joyi bosilganda
-      gMap.addListener('click', function (e) {
-        gMarker.setPosition(e.latLng);
-        onMapLocationSelected(e.latLng.lat(), e.latLng.lng());
-      });
-    } else {
-      gMap.setCenter(pos);
-      gMarker.setPosition(pos);
-    }
-  } else {
-    // Agar Google Maps yuklanayotgan bo'lsa qayta urinib ko'rish
+  // Yandex Maps tayyor bo'lishini kutish
+  if (typeof ymaps === 'undefined') {
     setTimeout(() => initDeliveryMap(lat, lon), 500);
+    return;
   }
+
+  ymaps.ready(() => {
+    const coords = [parseFloat(lat), parseFloat(lon)];
+
+    if (!yMap) {
+      // Yangi xarita yaratish
+      yMap = new ymaps.Map(container, {
+        center: coords,
+        zoom: 16,
+        controls: ['zoomControl']
+      }, {
+        suppressMapOpenBlock: true
+      });
+
+      // Suriluvchi marker (Placemark)
+      yMarker = new ymaps.Placemark(coords, {
+        hintContent: 'Yetkazish manzili',
+        balloonContent: '📍 Manzilni o\'zgartirish uchun suring'
+      }, {
+        draggable: true,
+        preset: 'islands#redDotIcon'
+      });
+
+      yMap.geoObjects.add(yMarker);
+
+      // Marker surilganda koordinatani olish
+      yMarker.events.add('dragend', function () {
+        const newCoords = yMarker.geometry.getCoordinates();
+        onMapLocationSelected(newCoords[0], newCoords[1]);
+      });
+
+      // Xaritaning istalgan joyiga bosilganda marker o'sha yerga o'tadi
+      yMap.events.add('click', function (e) {
+        const newCoords = e.get('coords');
+        yMarker.geometry.setCoordinates(newCoords);
+        onMapLocationSelected(newCoords[0], newCoords[1]);
+      });
+
+    } else {
+      // Mavjud xaritada faqat maratsiyani va ko'rinishni yangilash
+      yMap.setCenter(coords, 16);
+      yMarker.geometry.setCoordinates(coords);
+    }
+  });
 }
 
 function onMapLocationSelected(lat, lon) {
@@ -1104,8 +1114,6 @@ function onMapLocationSelected(lat, lon) {
   document.getElementById('location-coords').textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
   tg.HapticFeedback.selectionChanged();
   showToast('📍 Manzil o\'zgartirildi, narx qayta hisoblanmoqda...');
-  
-  // Real vaqtda yetkazib berish va umumiy summani darhol qayta hisoblash
   const items = getCartItems();
   fetchDeliveryFee(items, lat, lon);
 }
@@ -1113,43 +1121,42 @@ function onMapLocationSelected(lat, lon) {
 function getCurrentGPSLocation() {
   const btnStatus = document.getElementById('delivery-calc-status');
   if (btnStatus) btnStatus.textContent = '🛰️ GPS aniqlanmoqda...';
-  
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(pos => {
-      const lat = pos.coords.latitude;
-      const lon = pos.coords.longitude;
-      userLocation = { lat, lon };
-      
-      document.getElementById('location-name').textContent = '📍 Aniq joylashuvingiz (GPS)';
-      document.getElementById('location-coords').textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-      
-      if (gMap && gMarker) {
-        const newPos = { lat, lng: lon };
-        gMap.setCenter(newPos);
-        gMap.setZoom(17);
-        gMarker.setPosition(newPos);
-      } else {
-        initDeliveryMap(lat, lon);
-      }
-      
-      tg.HapticFeedback.notificationOccurred('success');
-      showToast('🎯 Joylashuvingiz bir martada aniq olindi!');
-      
-      // Narxni ANIQ va DARHOL qayta hisoblash
-      const items = getCartItems();
-      fetchDeliveryFee(items, lat, lon);
-    }, err => {
-      console.error('GPS error:', err);
-      showToast('⚠️ Joylashuvni aniqlab bo\'lmadi. Xaritadan tanlang.');
-      if (btnStatus) btnStatus.textContent = '⚠️ GPS xatosi';
-    }, { 
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0 
-    });
-  } else {
+
+  if (!navigator.geolocation) {
     showToast('⚠️ Qurilmada GPS qo\'llab-quvvatlanmaydi.');
+    return;
   }
+
+  navigator.geolocation.getCurrentPosition(pos => {
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
+    userLocation = { lat, lon };
+
+    document.getElementById('location-name').textContent = '📍 Aniq joylashuvingiz (GPS)';
+    document.getElementById('location-coords').textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+
+    if (yMap && yMarker) {
+      const coords = [lat, lon];
+      yMap.setCenter(coords, 17);
+      yMarker.geometry.setCoordinates(coords);
+    } else {
+      initDeliveryMap(lat, lon);
+    }
+
+    tg.HapticFeedback.notificationOccurred('success');
+    showToast('🎯 Joylashuvingiz bir martada aniq olindi!');
+
+    const items = getCartItems();
+    fetchDeliveryFee(items, lat, lon);
+  }, err => {
+    console.error('GPS error:', err);
+    showToast('⚠️ Joylashuvni aniqlab bo\'lmadi. Xaritadan tanlang.');
+    if (btnStatus) btnStatus.textContent = '⚠️ GPS xatosi';
+  }, {
+    enableHighAccuracy: true,
+    timeout: 10000,
+    maximumAge: 0
+  });
 }
 
 // ============================================================
