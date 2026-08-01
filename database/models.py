@@ -43,6 +43,20 @@ async def create_tables():
         );
     """)
 
+    # 2.6 restaurants table (Taomim hamkor oshxonalar)
+    await execute_query("""
+        CREATE TABLE IF NOT EXISTS restaurants (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            phone VARCHAR(20),
+            address TEXT,
+            latitude DOUBLE PRECISION NOT NULL DEFAULT 41.2995,
+            longitude DOUBLE PRECISION NOT NULL DEFAULT 69.2401,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT NOW()
+        );
+    """)
+
     # 3. products table
     await execute_query("""
         CREATE TABLE IF NOT EXISTS products (
@@ -51,6 +65,7 @@ async def create_tables():
             price NUMERIC(12, 2) NOT NULL,
             image_url TEXT DEFAULT NULL,
             category_id INT REFERENCES categories(id) ON DELETE SET NULL,
+            restaurant_id INT REFERENCES restaurants(id) ON DELETE SET NULL,
             is_active BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMP DEFAULT NOW()
         );
