@@ -598,6 +598,7 @@ h1, h2, h3, h4, .topnav-title, .product-name, .modal-product-name { font-family:
     <div class="floating-cart-price" id="float-cart-total-price">0 so'm</div>
   </div>
   <div class="floating-cart-btn">Savatchaga o'tish →</div>
+</div></div>
 </div>
 
 <!-- CART PAGE -->
@@ -905,28 +906,30 @@ async function loadUserProfile() {
 }
 
 async function loadProducts() {
+  const splashStart = Date.now();
   try {
     const [prodData, catData] = await Promise.all([
-      fetch((BASE_URL === '%%BASE_URL%%' ? '' : BASE_URL) + '/api/miniapp/products').then(r => r.json()).catch(() => null),
-      apiFetch('/api/categories').catch(() => null)
+      fetch(BASE_URL + '/api/miniapp/products').then(r => r.json()),
+      apiFetch('/api/categories')
     ]);
     loadLoyaltyInfo();
     loadUserProfile();
-    if (prodData && Array.isArray(prodData)) {
-      products = prodData;
+    if (prodData && !prodData.error) {
+      products = Array.isArray(prodData) ? prodData : [];
       categories = Array.isArray(catData) ? catData : [];
       renderCategoryTabs();
       renderProducts();
+    } else {
+      showToast('Mahsulotlarni yuklab bo\'lmadi');
     }
   } catch (err) {
     console.error('loadProducts error:', err);
   } finally {
-    setTimeout(hideSplash, 400);
+    const elapsed = Date.now() - splashStart;
+    const remaining = Math.max(0, 3000 - elapsed);
+    setTimeout(hideSplash, remaining);
   }
 }
-
-// Emergency Splash Dismissal if network is slow
-setTimeout(hideSplash, 1500);
 
 
 
