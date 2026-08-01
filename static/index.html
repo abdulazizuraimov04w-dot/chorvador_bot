@@ -5,8 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Taomim Admin Panel</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://api-maps.yandex.ru/2.1/?lang=uz_UZ" type="text/javascript"></script>
 <style>
 :root {
   --bg: #0f1117;
@@ -303,8 +302,7 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
 .map-action-arrived:hover { background:rgba(245,158,11,.3); }
 .map-action-done:hover { background:rgba(34,197,94,.3); }
 #delivery-map { flex:1; z-index:1; min-height:300px; width:100%; }
-.leaflet-popup-content-wrapper { background:var(--surface) !important; color:var(--text) !important; border:1px solid var(--border) !important; border-radius:10px !important; box-shadow:var(--shadow) !important; }
-.leaflet-popup-tip { background:var(--surface) !important; }
+
 .map-popup-title { font-size:14px; font-weight:700; margin-bottom:6px; }
 .map-popup-info { font-size:12px; color:var(--muted); margin-bottom:3px; }
 .map-popup-price { font-size:13px; font-weight:700; color:#4f8ef7; margin-top:6px; }
@@ -2138,20 +2136,24 @@ function toggleTheme() {
 // ==================== MAP ====================
 
 function initMap() {
-  // Har doim bugun
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('map-date').value = today;
 
-  // Init Leaflet map once
-  if (!mapInstance) {
-    mapInstance = L.map('delivery-map').setView([41.2995, 69.2401], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap'
-    }).addTo(mapInstance);
+  if (typeof ymaps === 'undefined') {
+    setTimeout(initMap, 500);
+    return;
   }
 
-  // Force map to recalculate size (fixes blank map on mobile)
-  setTimeout(() => { mapInstance.invalidateSize(); }, 200);
+  ymaps.ready(() => {
+    if (!mapInstance) {
+      mapInstance = new ymaps.Map('delivery-map', {
+        center: [41.2995, 69.2401],
+        zoom: 12,
+        controls: ['zoomControl', 'fullscreenControl']
+      }, { suppressMapOpenBlock: true });
+    }
+  });
+
   loadMapOrders();
 }
 
@@ -2214,66 +2216,70 @@ function renderMapSidebar() {
 }
 
 function renderMapMarkers() {
-  // Clear old markers
-  mapMarkers.forEach(m => m.remove());
+  // Eski markerlarni tozalash
+  mapMarkers.forEach(m => {
+    if (mapInstance) mapInstance.geoObjects.remove(m);
+  });
   mapMarkers = [];
 
-  if (!mapOrders.length) return;
+  if (!mapOrders.length || !mapInstance) return;
 
   const bounds = [];
 
   mapOrders.forEach(o => {
     const isDone = o.status === 'completed';
     const items = (o.items||[]).filter(i=>i.product_name).map(i=>`${i.product_name} × ${i.quantity}`).join('<br>');
-
-    // Custom colored marker
     const color = isDone ? '#22c55e' : (o.status === 'pending' ? '#f59e0b' : '#4f8ef7');
-    const icon = L.divIcon({
-      className: '',
-      html: `<div style="
-        width:32px;height:32px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);
-        background:${color};border:2px solid white;
-        box-shadow:0 2px 8px rgba(0,0,0,0.4);
-        display:flex;align-items:center;justify-content:center;
-      "><span style="transform:rotate(45deg);font-size:13px;">${isDone?'✓':'📦'}</span></div>`,
-      iconSize: [32, 32],
-      iconAnchor: [16, 32],
-      popupAnchor: [0, -34]
-    });
+    const emoji = isDone ? '✓' : '📦';
 
-    const marker = L.marker([o.latitude, o.longitude], { icon })
-      .addTo(mapInstance)
-      .bindPopup(`
-        <div class="map-popup-title">#${o.order_id} — ${esc(o.full_name||'')}</div>
-        <div class="map-popup-info">📞 ${o.phone_number||''}</div>
-        <div class="map-popup-info">${items||'—'}</div>
-        <div class="map-popup-price">${fmtMoney(o.total_price)}</div>
-        ${!isDone ? `<button class="map-popup-btn" onclick="mapMarkDone(${o.order_id})">✅ Yetkazildi</button>` : '<div style="color:#22c55e;font-weight:700;margin-top:6px;">✓ Yetkazilgan</div>'}
-      `);
+    const placemark = new ymaps.Placemark(
+      [o.latitude, o.longitude],
+      {
+        balloonContentHeader: `#${o.order_id} — ${o.full_name || ''}`,
+        balloonContentBody: `
+          <div style="font-size:13px;">
+            <div>📞 ${o.phone_number || ''}</div>
+            <div>${items || '—'}</div>
+            <div style="font-weight:700;margin-top:4px;">${fmtMoney(o.total_price)}</div>
+            ${!isDone
+              ? `<button onclick="mapMarkDone(${o.order_id})" style="margin-top:6px;padding:4px 10px;background:${color};color:#fff;border:none;border-radius:6px;cursor:pointer;">✅ Yetkazildi</button>`
+              : `<div style="color:#22c55e;font-weight:700;margin-top:6px;">✓ Yetkazilgan</div>`
+            }
+          </div>`
+      },
+      {
+        preset: isDone ? 'islands#greenDotIcon' : (o.status === 'pending' ? 'islands#yellowDotIcon' : 'islands#blueDotIcon')
+      }
+    );
 
-    marker.on('click', () => selectMapOrder(o.order_id));
-    mapMarkers.push(marker);
+    placemark.events.add('click', () => selectMapOrder(o.order_id));
+    mapInstance.geoObjects.add(placemark);
+    mapMarkers.push(placemark);
     bounds.push([o.latitude, o.longitude]);
   });
 
-  // Fit map to show all markers
-  if (bounds.length) {
-    mapInstance.fitBounds(bounds, { padding: [40, 40] });
+  // Barcha markerlar ko'rinadigan qilib xaritani moslashtirish
+  if (bounds.length > 1) {
+    mapInstance.setBounds(ymaps.util.bounds.fromPoints(bounds), { checkZoomRange: true, zoomMargin: 40 });
+  } else if (bounds.length === 1) {
+    mapInstance.setCenter(bounds[0], 14);
   }
 }
 
 function selectMapOrder(id) {
   selectedMapOrderId = id;
-  // Highlight sidebar item
   document.querySelectorAll('.map-order-item').forEach(el => el.classList.remove('selected'));
   const el = document.getElementById('mapitem-' + id);
   if (el) { el.classList.add('selected'); el.scrollIntoView({ behavior:'smooth', block:'nearest' }); }
 
-  // Open marker popup
+  // Marker balloon ochish
   const order = mapOrders.find(o => o.order_id === id);
-  if (!order) return;
+  if (!order || !mapInstance) return;
   const idx = mapOrders.indexOf(order);
-  if (mapMarkers[idx]) mapMarkers[idx].openPopup();
+  if (mapMarkers[idx]) {
+    mapMarkers[idx].balloon.open();
+    mapInstance.setCenter([order.latitude, order.longitude]);
+  }
 }
 
 async function mapNotifyArrived(orderId) {
@@ -2945,37 +2951,66 @@ async function loadRestaurantsPage() {
   `).join('');
 }
 
+// Yandex Maps o'zgaruvchilari (restoran joy tanlash)
+let restaurantYMap = null;
+let restaurantYMarker = null;
+
 function initRestaurantMapPicker(lat, lon) {
-  if (restaurantMapPicker) {
-    restaurantMapPicker.remove();
-    restaurantMapPicker = null;
-    restaurantMapMarker = null;
+  if (typeof ymaps === 'undefined') {
+    setTimeout(() => initRestaurantMapPicker(lat, lon), 500);
+    return;
   }
-  restaurantMapPicker = L.map('restaurant-map-picker').setView([lat, lon], 13);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors'
-  }).addTo(restaurantMapPicker);
 
-  restaurantMapMarker = L.marker([lat, lon], { draggable: true }).addTo(restaurantMapPicker);
-  restaurantMapMarker.on('dragend', e => updateRestaurantCoords(e.target.getLatLng()));
+  ymaps.ready(() => {
+    const coords = [parseFloat(lat), parseFloat(lon)];
 
-  restaurantMapPicker.on('click', e => {
-    restaurantMapMarker.setLatLng(e.latlng);
-    updateRestaurantCoords(e.latlng);
+    if (restaurantYMap) {
+      restaurantYMap.destroy();
+      restaurantYMap = null;
+      restaurantYMarker = null;
+    }
+
+    restaurantYMap = new ymaps.Map('restaurant-map-picker', {
+      center: coords,
+      zoom: 15,
+      controls: ['zoomControl']
+    }, { suppressMapOpenBlock: true });
+
+    restaurantYMarker = new ymaps.Placemark(coords, {
+      hintContent: 'Oshxona joylashuvi',
+      balloonContent: '📍 Markerini suring yoki xaritaga bosing'
+    }, {
+      draggable: true,
+      preset: 'islands#redDotIcon'
+    });
+
+    restaurantYMap.geoObjects.add(restaurantYMarker);
+
+    restaurantYMarker.events.add('dragend', function () {
+      const c = restaurantYMarker.geometry.getCoordinates();
+      updateRestaurantCoords({ lat: c[0], lng: c[1] });
+    });
+
+    restaurantYMap.events.add('click', function (e) {
+      const c = e.get('coords');
+      restaurantYMarker.geometry.setCoordinates(c);
+      updateRestaurantCoords({ lat: c[0], lng: c[1] });
+    });
   });
 }
 
 function updateRestaurantCoords(latlng) {
   document.getElementById('rest-lat').value = latlng.lat.toFixed(6);
   document.getElementById('rest-lon').value = latlng.lng.toFixed(6);
-  // Reverse geocode with Nominatim
-  fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latlng.lat}&lon=${latlng.lng}&format=json`)
-    .then(r => r.json())
-    .then(d => {
-      if (d && d.display_name) {
-        document.getElementById('rest-address').value = d.display_name;
+  // Yandex Geocoder orqali manzilni aniqlash
+  if (typeof ymaps !== 'undefined') {
+    ymaps.geocode([latlng.lat, latlng.lng], { results: 1 }).then(res => {
+      const first = res.geoObjects.get(0);
+      if (first) {
+        document.getElementById('rest-address').value = first.getAddressLine();
       }
-    }).catch(() => {});
+    });
+  }
 }
 
 function openAddRestaurant() {
@@ -2988,7 +3023,7 @@ function openAddRestaurant() {
   document.getElementById('rest-lon').value = '69.2401';
   document.getElementById('rest-active').value = 'true';
   document.getElementById('restaurant-modal').classList.add('open');
-  setTimeout(() => initRestaurantMapPicker(41.2995, 69.2401), 100);
+  setTimeout(() => initRestaurantMapPicker(41.2995, 69.2401), 200);
 }
 
 function openEditRestaurant(id) {
@@ -3003,7 +3038,7 @@ function openEditRestaurant(id) {
   document.getElementById('rest-lon').value = r.longitude;
   document.getElementById('rest-active').value = r.is_active ? 'true' : 'false';
   document.getElementById('restaurant-modal').classList.add('open');
-  setTimeout(() => initRestaurantMapPicker(r.latitude, r.longitude), 100);
+  setTimeout(() => initRestaurantMapPicker(r.latitude, r.longitude), 200);
 }
 
 async function saveRestaurant() {
