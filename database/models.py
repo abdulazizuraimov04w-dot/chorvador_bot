@@ -463,31 +463,16 @@ async def get_loyalty_target() -> int:
 
 # --- RESTAURANT METHODS ---
 import math
-import urllib.request
-import json
 
-def get_driving_distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Oshxonadan mijozgacha bo'lgan avtomobil yo'li (driving route) masofasini km da hisoblaydi."""
-    url = f"http://router.project-osrm.org/route/v1/driving/{lon1},{lat1};{lon2},{lat2}?overview=false"
-    try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'TaomimApp/1.0'})
-        with urllib.request.urlopen(req, timeout=3) as resp:
-            data = json.loads(resp.read().decode('utf-8'))
-            if data.get('code') == 'Ok' and data.get('routes'):
-                dist_meters = data['routes'][0]['distance']
-                return round(dist_meters / 1000.0, 2)
-    except Exception as e:
-        logger.warning(f"OSRM routing API error, using fallback coefficient: {e}")
-    
-    # Fallback: Haversine * 1.35 (Avtomobil ko me ko'chalari koeffitsienti)
+def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Ikki koordinata orasidagi masofani km da hisoblaydi (Haversine formulasi)."""
     R = 6371.0
     dlat = math.radians(lat2 - lat1)
     dlon = math.radians(lon2 - lon1)
     a = (math.sin(dlat / 2) ** 2 +
          math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
          math.sin(dlon / 2) ** 2)
-    haversine = R * 2 * math.asin(math.sqrt(a))
-    return round(haversine * 1.35, 2)
+    return R * 2 * math.asin(math.sqrt(a))
 
 async def get_delivery_fee_settings() -> Dict[str, float]:
     """Yetkazib berish tariflari sozlamalarini olish."""
@@ -501,7 +486,7 @@ async def get_delivery_fee_settings() -> Dict[str, float]:
     return result
 
 async def calculate_delivery_fee(user_lat: float, user_lon: float, restaurant_ids: List[int]) -> Dict[str, Any]:
-    """Eng uzoq oshxonaga qarab avtomobil yo'li bo'yicha yetkazib berish narxini hisoblaydi."""
+    """Eng uzoq oshxonaga qarab yetkazib berish narxini hisoblaydi."""
     if not restaurant_ids:
         return {'fee': 0, 'distance_km': 0, 'restaurant_id': None}
 
@@ -516,7 +501,7 @@ async def calculate_delivery_fee(user_lat: float, user_lon: float, restaurant_id
         restaurant = await get_restaurant_by_id(r_id)
         if not restaurant:
             continue
-        dist = get_driving_distance_km(user_lat, user_lon, restaurant['latitude'], restaurant['longitude'])
+        dist = haversine_km(user_lat, user_lon, restaurant['latitude'], restaurant['longitude'])
         if dist > max_distance:
             max_distance = dist
             farthest_id  = r_id
