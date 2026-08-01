@@ -245,6 +245,21 @@ async def create_tables():
         await execute_query("INSERT INTO branches (name) VALUES ('Asosiy filial');")
         logger.info("Default branch inserted.")
 
+    # Insert default restaurants if empty
+    rest_count = await fetch_val("SELECT COUNT(*) FROM restaurants;")
+    if rest_count == 0:
+        await execute_query("""
+            INSERT INTO restaurants (name, phone, address, latitude, longitude) VALUES
+            ('Toshkent Milliy Taomlari 🍲', '+998901234567', 'Toshkent sh., Chorsu', 41.3275, 69.2401),
+            ('Express Fast Food 🍔', '+998909876543', 'Toshkent sh., Amir Temur shoh ko''chasi', 41.3111, 69.2797);
+        """)
+        logger.info("Default restaurants inserted.")
+
+        # Update existing products to assign default restaurant
+        first_rest_id = await fetch_val("SELECT id FROM restaurants ORDER BY id ASC LIMIT 1;")
+        if first_rest_id:
+            await execute_query("UPDATE products SET restaurant_id = $1 WHERE restaurant_id IS NULL;", first_rest_id)
+
 # --- USER METHODS ---
 
 async def get_user_by_telegram_id(telegram_id: int) -> Optional[Dict[str, Any]]:
