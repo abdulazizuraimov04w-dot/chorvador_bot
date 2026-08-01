@@ -6,9 +6,6 @@
 <title>Taomim</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://api-maps.yandex.ru/2.1/?lang=uz_UZ" type="text/javascript"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root {
   --bg: #f5f6fa;
@@ -672,17 +669,15 @@ async function loadUserProfile() {
 async function loadProducts() {
   const splashStart = Date.now();
   try {
-    const [prodData, catData, restData] = await Promise.all([
+    const [prodData, catData] = await Promise.all([
       fetch((BASE_URL === '%%BASE_URL%%' ? '' : BASE_URL) + '/api/miniapp/products').then(r => r.json()).catch(() => null),
-      apiFetch('/api/categories').catch(() => null),
-      apiFetch('/api/restaurants').catch(() => null)
+      apiFetch('/api/categories').catch(() => null)
     ]);
     loadLoyaltyInfo();
     loadUserProfile();
     if (prodData && !prodData.error) {
       products = Array.isArray(prodData) ? prodData : [];
       categories = Array.isArray(catData) ? catData : [];
-      restaurants = Array.isArray(restData) ? restData : [];
       renderCategoryTabs();
       renderProducts();
     } else {
@@ -700,20 +695,14 @@ async function loadProducts() {
 function renderCategoryTabs() {
   const wrap = document.getElementById('category-tabs-wrap');
   if (!wrap) return;
-  
-  let html = `<button type="button" class="cat-tab-btn ${selectedCategoryId==='all' && selectedRestaurantId==='all'?'active':''}" onclick="selectCategory('all')">Barchasi 🛍️</button>`;
-  
-  // Oshxonalar filtri tugmalari (agar oshxonalar mavjud bo'lsa)
-  if (restaurants.length) {
-    restaurants.forEach(r => {
-      const isAct = String(selectedRestaurantId) === String(r.id);
-      html += `<button type="button" class="cat-tab-btn ${isAct?'active':''}" style="border-color:rgba(255,138,0,0.4);" onclick="selectRestaurant(${r.id})">🏪 ${esc(r.name)}</button>`;
-    });
+  if (!categories.length) {
+    wrap.style.display = 'none';
+    return;
   }
-
-  // Kategoriya filtri tugmalari
+  wrap.style.display = 'flex';
+  let html = `<button type="button" class="cat-tab-btn ${selectedCategoryId==='all'?'active':''}" onclick="selectCategory('all')">Barchasi 🛍️</button>`;
   categories.forEach(c => {
-    const isAct = String(selectedCategoryId) === String(c.id) && selectedRestaurantId === 'all';
+    const isAct = String(selectedCategoryId) === String(c.id);
     html += `<button type="button" class="cat-tab-btn ${isAct?'active':''}" onclick="selectCategory(${c.id})">${c.icon || '🛍️'} ${esc(c.name)}</button>`;
   });
   wrap.innerHTML = html;
@@ -721,14 +710,6 @@ function renderCategoryTabs() {
 
 function selectCategory(catId) {
   selectedCategoryId = catId;
-  selectedRestaurantId = 'all';
-  renderCategoryTabs();
-  renderProducts();
-}
-
-function selectRestaurant(restId) {
-  selectedRestaurantId = restId;
-  selectedCategoryId = 'all';
   renderCategoryTabs();
   renderProducts();
 }
@@ -765,9 +746,7 @@ function renderProducts() {
   const list = document.getElementById('products-list');
   let filtered = products;
 
-  if (selectedRestaurantId !== 'all') {
-    filtered = filtered.filter(p => String(p.restaurant_id) === String(selectedRestaurantId));
-  } else if (selectedCategoryId !== 'all') {
+  if (selectedCategoryId !== 'all') {
     filtered = filtered.filter(p => String(p.category_id) === String(selectedCategoryId));
   }
 
