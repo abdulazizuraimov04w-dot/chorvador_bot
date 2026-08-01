@@ -196,8 +196,8 @@ async function loadOrders() {
 
         const statusInfo = statusMap[order.status] || { text: order.status, class: "" };
         
-        // Yandex Maps routing link
-        const mapsLink = `https://yandex.uz/maps/?rtext=~${order.latitude},${order.longitude}&rtt=auto`;
+        // Google Maps auto-routing link using courier current position to target coordinates
+        const mapsLink = `https://www.google.com/maps/dir/?api=1&destination=${order.latitude},${order.longitude}`;
         
         // Build items list html
         let itemsHtml = "";
@@ -253,7 +253,7 @@ async function loadOrders() {
                         </div>
                         <div class="info-item">
                             <strong>Yetkazish manzili</strong>
-                            <a href="${mapsLink}" target="_blank" class="route-link">🗺️ Yandex Maps (Marshrut)</a>
+                            <a href="${mapsLink}" target="_blank" class="route-link">🗺️ Google Maps (Marshrut)</a>
                         </div>
                     </div>
                     

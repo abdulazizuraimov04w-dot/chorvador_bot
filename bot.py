@@ -678,43 +678,23 @@ async def api_miniapp_order(request):
         delivery_time_end   = data.get("delivery_time_end", "23:00")
         new_lat             = data.get("latitude")
         new_lon             = data.get("longitude")
-        full_name           = data.get("full_name")
-        phone_number        = data.get("phone_number")
+        payment_method      = data.get("payment_method", "cash")  # 'cash' yoki 'click'
 
         if not telegram_id or not items:
             return web.json_response({"error": "Ma'lumotlar to'liq emas!"}, status=400)
 
-        # Foydalanuvchi tekshiruvi / Avto ro'yxatdan o'tkazish
+        # Foydalanuvchi tekshiruvi
         user = await models.get_user_by_telegram_id(int(telegram_id))
         if not user:
-            if full_name and phone_number:
-                # Yangi foydalanuvchini DB da yaratish
-                await models.create_user(
-                    telegram_id=int(telegram_id),
-                    full_name=full_name,
-                    phone_number=phone_number,
-                    latitude=float(new_lat) if new_lat else None,
-                    longitude=float(new_lon) if new_lon else None,
-                    branch_id=1,
-                    is_admin=False
-                )
-                user = await models.get_user_by_telegram_id(int(telegram_id))
-            else:
-                return web.json_response({"error": "NOT_REGISTERED", "message": "Iltimos, ism va telefon raqamingizni kiriting!"}, status=400)
+            return web.json_response({"error": "Foydalanuvchi topilmadi! Avval botdan ro'yxatdan o'ting."}, status=404)
 
-        # Agar ism yoki tel berilgan bo'lsa va bazada yangilash kerak bo'lsa
-        if full_name or phone_number or (new_lat and new_lon):
+        # Agar yangi lokatsiya yuborilgan bo'lsa — yangilash
+        if new_lat and new_lon:
             from database.connection import execute_query
-            up_name = full_name if full_name else user.get('full_name')
-            up_phone = phone_number if phone_number else user.get('phone_number')
-            up_lat = float(new_lat) if new_lat else user.get('latitude')
-            up_lon = float(new_lon) if new_lon else user.get('longitude')
             await execute_query(
-                "UPDATE users SET full_name = $1, phone_number = $2, latitude = $3, longitude = $4 WHERE telegram_id = $5;",
-                up_name, up_phone, up_lat, up_lon, int(telegram_id)
+                "UPDATE users SET latitude = $1, longitude = $2 WHERE telegram_id = $3;",
+                float(new_lat), float(new_lon), int(telegram_id)
             )
-            user['full_name'] = up_name
-            user['phone_number'] = up_phone
 
         import datetime
         tz_uz = datetime.timezone(datetime.timedelta(hours=5))
@@ -810,7 +790,7 @@ async def api_miniapp_order(request):
             try:
                 loc_link = ""
                 if user.get("latitude") and user.get("longitude"):
-                    loc_link = f"\n📍 [Mijoz joylashuvi (Lokatsiya)](https://yandex.uz/maps/?pt={user['longitude']},{user['latitude']}&z=16&l=map)"
+                    loc_link = f"\n📍 [Mijoz joylashuvi (Lokatsiya)](https://maps.google.com/?q={user['latitude']},{user['longitude']})"
                 
                 courier_text = (
                     f"🚚 **YANGI BUYURTMA (Kuryer uchun)**\n\n"
@@ -1125,7 +1105,7 @@ async def api_assign_order_courier(request):
                     
                 loc_link = ""
                 if order_row['latitude'] and order_row['longitude']:
-                    loc_link = f"\n📍 [Mijoz joylashuvi (Lokatsiya)](https://yandex.uz/maps/?pt={order_row['longitude']},{order_row['latitude']}&z=16&l=map)"
+                    loc_link = f"\n📍 [Mijoz joylashuvi (Lokatsiya)](https://maps.google.com/?q={order_row['latitude']},{order_row['longitude']})"
                 
                 courier_text = (
                     f"🚚 **BUYURTMA BIRIKTIRILDI (Kuryer uchun)**\n\n"
