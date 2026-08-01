@@ -839,11 +839,10 @@ tg.BackButton.onClick(() => {
 // API
 // ============================================================
 async function apiFetch(path, method='GET', body=null) {
-  const cleanBase = (BASE_URL && !BASE_URL.includes('%%')) ? BASE_URL : '';
   const opts = { method, headers: { 'Authorization': 'Bearer ' + TOKEN } };
   if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
   try {
-    const r = await fetch(cleanBase + path, opts);
+    const r = await fetch(BASE_URL + path, opts);
     return await r.json();
   } catch(e) { console.error('API error:', e); return null; }
 }
