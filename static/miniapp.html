@@ -776,26 +776,17 @@ h1, h2, h3, h4, .topnav-title, .product-name, .modal-product-name { font-family:
 // ============================================================
 // TELEGRAM MINI APP INIT
 // ============================================================
-const tg = window.Telegram?.WebApp || {};
-try {
-  if (tg.ready) tg.ready();
-  if (tg.expand) tg.expand();
-} catch (e) {
-  console.warn('Telegram WebApp init warning:', e);
-}
+const tg = window.Telegram.WebApp;
+tg.ready();
+tg.expand();
 
 // ============================================================
 // SPLASH — mahsulotlar yuklanib bo'lgach yashirish
 // ============================================================
 function hideSplash() {
   const splash = document.getElementById('splash');
-  if (splash) {
-    splash.style.opacity = '0';
-    splash.style.pointerEvents = 'none';
-    setTimeout(() => {
-      if (splash && splash.parentNode) splash.parentNode.removeChild(splash);
-    }, 300);
-  }
+  splash.classList.add('hide');
+  setTimeout(() => splash.remove(), 450);
 }
 
 // ============================================================
@@ -1641,8 +1632,6 @@ function showToast(msg) {
 // INIT — splash bilan birga mahsulotlarni yuklash
 // ============================================================
 loadProducts();
-setTimeout(hideSplash, 600);
-setTimeout(hideSplash, 1200);
 </script>
 </body>
 </html>
