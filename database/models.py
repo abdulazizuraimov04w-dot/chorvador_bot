@@ -165,12 +165,16 @@ async def create_tables():
             address TEXT,
             latitude DOUBLE PRECISION NOT NULL DEFAULT 41.2995,
             longitude DOUBLE PRECISION NOT NULL DEFAULT 69.2401,
+            image_url TEXT DEFAULT NULL,
             is_active BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMP DEFAULT NOW()
         );
     """)
 
     # Migrations
+    await execute_query("""
+        ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT NULL;
+    """)
     await execute_query("""
         ALTER TABLE users ADD COLUMN IF NOT EXISTS mfy_id INT REFERENCES mfy(id) ON DELETE SET NULL;
     """)
@@ -535,22 +539,22 @@ async def get_restaurant_by_id(restaurant_id: int) -> Optional[Dict[str, Any]]:
     return dict(row) if row else None
 
 async def create_restaurant(name: str, phone: str, address: str,
-                            latitude: float, longitude: float) -> Dict[str, Any]:
+                            latitude: float, longitude: float, image_url: str = None) -> Dict[str, Any]:
     row = await fetch_row("""
-        INSERT INTO restaurants (name, phone, address, latitude, longitude)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO restaurants (name, phone, address, latitude, longitude, image_url)
+        VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *;
-    """, name, phone, address, latitude, longitude)
+    """, name, phone, address, latitude, longitude, image_url)
     return dict(row)
 
 async def update_restaurant(restaurant_id: int, name: str, phone: str, address: str,
-                            latitude: float, longitude: float, is_active: bool) -> Optional[Dict[str, Any]]:
+                            latitude: float, longitude: float, is_active: bool, image_url: str = None) -> Optional[Dict[str, Any]]:
     row = await fetch_row("""
         UPDATE restaurants
-        SET name=$1, phone=$2, address=$3, latitude=$4, longitude=$5, is_active=$6
-        WHERE id=$7
+        SET name=$1, phone=$2, address=$3, latitude=$4, longitude=$5, is_active=$6, image_url=$7
+        WHERE id=$8
         RETURNING *;
-    """, name, phone, address, latitude, longitude, is_active, restaurant_id)
+    """, name, phone, address, latitude, longitude, is_active, image_url, restaurant_id)
     return dict(row) if row else None
 
 async def delete_restaurant(restaurant_id: int) -> bool:

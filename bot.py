@@ -1158,9 +1158,10 @@ async def api_create_restaurant(request):
         address   = data.get('address', '').strip()
         latitude  = float(data.get('latitude', 41.2995))
         longitude = float(data.get('longitude', 69.2401))
+        image_url = data.get('image_url', '').strip() or None
         if not name:
             return web.json_response({"error": "Oshxona nomi kiritilmagan!"}, status=400)
-        restaurant = await models.create_restaurant(name, phone, address, latitude, longitude)
+        restaurant = await models.create_restaurant(name, phone, address, latitude, longitude, image_url)
         if 'created_at' in restaurant and restaurant['created_at']:
             restaurant['created_at'] = restaurant['created_at'].strftime('%d.%m.%Y %H:%M')
         return web.json_response(restaurant)
@@ -1181,9 +1182,10 @@ async def api_update_restaurant(request):
         latitude  = float(data.get('latitude', 41.2995))
         longitude = float(data.get('longitude', 69.2401))
         is_active = bool(data.get('is_active', True))
+        image_url = data.get('image_url', '').strip() or None
         if not name:
             return web.json_response({"error": "Oshxona nomi kiritilmagan!"}, status=400)
-        restaurant = await models.update_restaurant(r_id, name, phone, address, latitude, longitude, is_active)
+        restaurant = await models.update_restaurant(r_id, name, phone, address, latitude, longitude, is_active, image_url)
         if not restaurant:
             return web.json_response({"error": "Oshxona topilmadi!"}, status=404)
         if 'created_at' in restaurant and restaurant['created_at']:

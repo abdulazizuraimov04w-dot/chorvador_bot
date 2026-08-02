@@ -907,6 +907,17 @@ input:checked + .toggle-slider::before { transform:translateX(18px); }
       <input type="text" id="rest-phone" class="form-input" placeholder="+998 90 123 45 67">
     </div>
     <div class="form-group" style="margin-bottom:12px;">
+      <label class="form-label">🖼️ Oshxona rasmi</label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="text" id="rest-image" class="form-input" placeholder="Rasm URL havolasi yoki fayl yuklang..." style="flex:1;">
+        <button type="button" class="action-btn secondary" onclick="document.getElementById('rest-file-input').click()">📁 Yuklash</button>
+        <input type="file" id="rest-file-input" accept="image/*" style="display:none" onchange="uploadRestImage(this)">
+      </div>
+      <div id="rest-img-preview" style="margin-top:6px;display:none;">
+        <img id="rest-img-tag" src="" alt="Preview" style="height:70px;border-radius:8px;object-fit:cover;border:1px solid var(--border);">
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:12px;">
       <label class="form-label">Manzil (avtomatik to'ldiriladi)</label>
       <input type="text" id="rest-address" class="form-input" placeholder="Xaritadan belgilang...">
     </div>
@@ -2891,6 +2902,27 @@ let editingRestaurantId = null;
 let restaurantMapPicker = null;
 let restaurantMapMarker = null;
 
+async function uploadRestImage(input) {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  const formData = new FormData();
+  formData.append('file', file);
+  showToast('Rasm yuklanmoqda...', 'info');
+  try {
+    const res = await fetch('/api/upload', { method: 'POST', body: formData, headers: { 'Authorization': 'Bearer ' + API_TOKEN } });
+    const data = await res.json();
+    if (data.url) {
+      document.getElementById('rest-image').value = data.url;
+      const prev = document.getElementById('rest-img-preview');
+      const tag = document.getElementById('rest-img-tag');
+      tag.src = data.url; prev.style.display = 'block';
+      showToast('Rasm muvaffaqiyatli yuklandi!', 'success');
+    } else {
+      showToast(data.error || 'Rasm yuklashda xatolik!', 'error');
+    }
+  } catch(e) { showToast('Rasm yuklashda xatolik!', 'error'); }
+}
+
 async function loadRestaurantsListGlobally() {
   const data = await api('/api/restaurants');
   if (data && Array.isArray(data)) {
@@ -2922,8 +2954,9 @@ async function loadRestaurantsPage() {
     return;
   }
   g.innerHTML = allRestaurantsList.map(r => `
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;position:relative;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;position:relative;display:flex;flex-direction:column;gap:10px;">
+      ${r.image_url ? `<img src="${esc(r.image_url)}" style="width:100%;height:140px;object-fit:cover;border-radius:10px;" alt="${esc(r.name)}">` : ''}
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
         <div>
           <div style="font-weight:700;font-size:15px;">${esc(r.name)}</div>
           <div style="font-size:12px;color:var(--muted);margin-top:2px;">${r.phone ? esc(r.phone) : '—'}</div>
@@ -2932,12 +2965,12 @@ async function loadRestaurantsPage() {
           ${r.is_active ? '✅ Faol' : '❌ Nofaol'}
         </span>
       </div>
-      ${r.address ? `<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">📍 ${esc(r.address)}</div>` : ''}
-      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">
+      ${r.address ? `<div style="font-size:12px;color:var(--muted);">📍 ${esc(r.address)}</div>` : ''}
+      <div style="font-size:12px;color:var(--muted);">
         🍽️ ${r.active_products_count || 0} ta faol taom &nbsp;|&nbsp;
         🌐 ${r.latitude?.toFixed(4)}, ${r.longitude?.toFixed(4)}
       </div>
-      <div style="display:flex;gap:6px;">
+      <div style="display:flex;gap:6px;margin-top:auto;">
         <button class="action-btn primary" style="flex:1;" onclick="openEditRestaurant(${r.id})">✏️ Tahrirlash</button>
         <button class="action-btn" style="flex:1;background:rgba(239,68,68,0.1);color:var(--red);border-color:rgba(239,68,68,0.3);" onclick="deleteRestaurant(${r.id})">🗑️ O'chirish</button>
       </div>
@@ -2984,6 +3017,8 @@ function openAddRestaurant() {
   document.getElementById('rest-name').value = '';
   document.getElementById('rest-phone').value = '';
   document.getElementById('rest-address').value = '';
+  document.getElementById('rest-image').value = '';
+  document.getElementById('rest-img-preview').style.display = 'none';
   document.getElementById('rest-lat').value = '41.2995';
   document.getElementById('rest-lon').value = '69.2401';
   document.getElementById('rest-active').value = 'true';
@@ -2999,6 +3034,14 @@ function openEditRestaurant(id) {
   document.getElementById('rest-name').value = r.name;
   document.getElementById('rest-phone').value = r.phone || '';
   document.getElementById('rest-address').value = r.address || '';
+  document.getElementById('rest-image').value = r.image_url || '';
+  const prev = document.getElementById('rest-img-preview');
+  if (r.image_url) {
+    document.getElementById('rest-img-tag').src = r.image_url;
+    prev.style.display = 'block';
+  } else {
+    prev.style.display = 'none';
+  }
   document.getElementById('rest-lat').value = r.latitude;
   document.getElementById('rest-lon').value = r.longitude;
   document.getElementById('rest-active').value = r.is_active ? 'true' : 'false';
@@ -3010,11 +3053,12 @@ async function saveRestaurant() {
   const name = document.getElementById('rest-name').value.trim();
   const phone = document.getElementById('rest-phone').value.trim();
   const address = document.getElementById('rest-address').value.trim();
+  const image_url = document.getElementById('rest-image').value.trim() || null;
   const latitude = parseFloat(document.getElementById('rest-lat').value);
   const longitude = parseFloat(document.getElementById('rest-lon').value);
   const is_active = document.getElementById('rest-active').value === 'true';
   if (!name) { showToast('Oshxona nomini kiriting!', 'error'); return; }
-  const payload = { name, phone, address, latitude, longitude, is_active };
+  const payload = { name, phone, address, latitude, longitude, is_active, image_url };
   let r;
   if (editingRestaurantId) {
     r = await api(`/api/restaurants/${editingRestaurantId}`, 'PUT', payload);
