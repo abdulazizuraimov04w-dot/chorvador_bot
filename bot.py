@@ -680,21 +680,44 @@ async def api_miniapp_order(request):
         new_lon             = data.get("longitude")
         payment_method      = data.get("payment_method", "cash")  # 'cash' yoki 'click'
 
+        full_name_inp       = data.get("full_name", "").strip()
+        phone_inp           = data.get("phone_number", "").strip()
+
         if not telegram_id or not items:
             return web.json_response({"error": "Ma'lumotlar to'liq emas!"}, status=400)
 
-        # Foydalanuvchi tekshiruvi
+        # Foydalanuvchi tekshiruvi (Buyurtma paytida sezilarsiz avto-ro'yxatdan o'tkazish)
         user = await models.get_user_by_telegram_id(int(telegram_id))
         if not user:
-            return web.json_response({"error": "Foydalanuvchi topilmadi! Avval botdan ro'yxatdan o'ting."}, status=404)
-
-        # Agar yangi lokatsiya yuborilgan bo'lsa — yangilash
-        if new_lat and new_lon:
-            from database.connection import execute_query
-            await execute_query(
-                "UPDATE users SET latitude = $1, longitude = $2 WHERE telegram_id = $3;",
-                float(new_lat), float(new_lon), int(telegram_id)
+            name = full_name_inp or "Foydalanuvchi"
+            phone = phone_inp or "+998900000000"
+            lat = float(new_lat) if new_lat else 41.2995
+            lon = float(new_lon) if new_lon else 69.2401
+            user = await models.create_user(
+                telegram_id=int(telegram_id),
+                full_name=name,
+                phone_number=phone,
+                latitude=lat,
+                longitude=lon
             )
+            logger.info(f"MiniApp Checkout Auto-Registration: Foydalanuvchi #{telegram_id} bazada yaratildi.")
+        else:
+            from database.connection import execute_query
+            if new_lat and new_lon:
+                await execute_query(
+                    "UPDATE users SET latitude = $1, longitude = $2 WHERE telegram_id = $3;",
+                    float(new_lat), float(new_lon), int(telegram_id)
+                )
+            if phone_inp and user.get("phone_number") != phone_inp:
+                await execute_query(
+                    "UPDATE users SET phone_number = $1 WHERE telegram_id = $2;",
+                    phone_inp, int(telegram_id)
+                )
+            if full_name_inp and user.get("full_name") != full_name_inp:
+                await execute_query(
+                    "UPDATE users SET full_name = $1 WHERE telegram_id = $2;",
+                    full_name_inp, int(telegram_id)
+                )
 
         import datetime
         tz_uz = datetime.timezone(datetime.timedelta(hours=5))

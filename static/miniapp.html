@@ -518,6 +518,20 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
   </div>
   <div class="order-form" style="padding-bottom:100px;">
     
+    <!-- 👤 QABUL QILUVCHI MA'LUMOTLARI -->
+    <div class="form-section" style="margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;">
+      <div class="form-section-title" style="font-weight:700;font-size:14px;margin-bottom:10px;">👤 Qabul qiluvchi ma'lumotlari</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div>
+          <label style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px;display:block;">Ism va familiyangiz *</label>
+          <input type="text" id="order-fullname-input" placeholder="Masalan: Alisher Usmonov" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);font-size:14px;outline:none;">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px;display:block;">Telefon raqamingiz *</label>
+          <input type="tel" id="order-phone-input" placeholder="+998 90 123 45 67" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);font-size:14px;outline:none;">
+        </div>
+      </div>
+    </div>
     <!-- 💳 PAYMENT METHOD -->
     <div class="form-section">
       <div class="form-section-title">💳 To'lov usulini tanlang</div>
@@ -1368,6 +1382,15 @@ function getCurrentGPSLocation() {
 function renderOrderForm() {
   const items = getCartItems();
   
+  // Telegram user ismini avtomatik to'ldirish
+  const fullnameInput = document.getElementById('order-fullname-input');
+  if (fullnameInput && !fullnameInput.value) {
+    const tgUser = tg?.initDataUnsafe?.user;
+    if (tgUser) {
+      fullnameInput.value = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ');
+    }
+  }
+
   // Standart koordinata (Toshkent markazi yoki mavjud saqlangan koordinata)
   let startLat = userLocation?.lat || 41.31108;
   let startLon = userLocation?.lon || 69.24056;
@@ -1429,11 +1452,25 @@ async function confirmOrder() {
   btn.disabled = true; btn.textContent = '⏳ Yuborilmoqda...';
   const items = getCartItems();
   if (!items.length) { showToast('Savatcha bo\'sh!'); btn.disabled = false; return; }
+
+  const fullName = document.getElementById('order-fullname-input')?.value.trim() || '';
+  const phoneNumber = document.getElementById('order-phone-input')?.value.trim() || '';
+
+  if (!phoneNumber || phoneNumber.length < 7) {
+    showToast('Iltimos, telefon raqamingizni kiriting!');
+    btn.disabled = false;
+    const phoneInp = document.getElementById('order-phone-input');
+    if (phoneInp) phoneInp.focus();
+    return;
+  }
+
   const today = new Date();
   const deliveryDate = new Date().toISOString().split('T')[0];
   const total = items.reduce((s,i) => s+i.subtotal, 0);
   const payload = {
     telegram_id: USER_TG_ID,
+    full_name: fullName,
+    phone_number: phoneNumber,
     items: items.map(i => ({ product_id: i.id, quantity: i.quantity, price: i.price })),
     total_price: total,
     delivery_fee: deliveryFeeAmount || 0,

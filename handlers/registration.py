@@ -27,47 +27,35 @@ async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     telegram_id = message.from_user.id
     
-    # Check if user already exists
     user = await models.get_user_by_telegram_id(telegram_id)
-    if user:
-        is_admin = telegram_id in ADMIN_IDS or user.get("is_admin", False)
-        # Update admin status in DB if needed
-        if telegram_id in ADMIN_IDS and not user.get("is_admin", False):
-            await models.update_user_admin_status(telegram_id, True)
-            is_admin = True
-            
-        logger.info(f"User {telegram_id} ({user['full_name']}) started the bot. Already registered.")
-        # Send main menu reply keyboard first so the customer has it permanently
-        await message.answer(
-            "🍽️ Taomim — tez va mazali taom yetkazib berish xizmati!",
-            reply_markup=keyboards.get_main_menu_keyboard(is_admin=is_admin)
-        )
+    is_admin = telegram_id in ADMIN_IDS or (user and user.get("is_admin", False))
+    if user and telegram_id in ADMIN_IDS and not user.get("is_admin", False):
+        await models.update_user_admin_status(telegram_id, True)
+        is_admin = True
         
-        # Define inline keyboard with MiniApp WebAppInfo
-        base_url = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
-        miniapp_url = f"{base_url}/miniapp"
-        inline_keyboard = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="🍽️ Taom buyurtma berish", web_app=WebAppInfo(url=miniapp_url))
-        ]])
-        
-        # Then send greeting message with the inline button
-        await message.answer(
-            f"Assalomu alaykum, {user['full_name']}! 👋\n\n"
-            "Buyurtma berish uchun pastdagi tugmani bosing:",
-            reply_markup=inline_keyboard
-        )
-        return
-
-    logger.info(f"New user {telegram_id} started the bot. Initiating registration.")
+    full_name = user['full_name'] if user else (message.from_user.full_name or "Hurmatli mijoz")
+    
+    # Send main menu reply keyboard first
     await message.answer(
-        "Assalomu alaykum! 🍽️ **Taomim** — tez va mazali taom yetkazib berish xizmatiga xush kelibsiz!\n\n"
-        "🚴 Tez yetkazish  ·  😋 Lazzatli taomlar\n\n"
-        "Xizmatdan foydalanish uchun ro'yxatdan o'tishingiz lozim.\n"
-        "Iltimos, **ism va familiyangizni** kiriting (masalan: Alisher Usmonov):",
-        parse_mode="Markdown",
-        reply_markup=ReplyKeyboardRemove()
+        "🍽️ Taomim — tez va mazali taom yetkazib berish xizmati! 🚀",
+        reply_markup=keyboards.get_main_menu_keyboard(is_admin=is_admin)
     )
-    await state.set_state(RegistrationStates.waiting_for_name)
+    
+    # Define inline keyboard with MiniApp WebAppInfo
+    base_url = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
+    miniapp_url = f"{base_url}/miniapp"
+    inline_keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="🍽️ Taom buyurtma berish", web_app=WebAppInfo(url=miniapp_url))
+    ]])
+    
+    # Send greeting message with the inline button directly to everyone!
+    await message.answer(
+        f"Assalomu alaykum, {full_name}! 👋\n\n"
+        "🍽️ Taomim orqali hamkor oshxonalardan qulay taom buyurtma bering.\n\n"
+        "Pastdagi tugmani bosing:",
+        reply_markup=inline_keyboard
+    )
+    return
 
 @router.message(RegistrationStates.waiting_for_name)
 async def process_name(message: Message, state: FSMContext):
