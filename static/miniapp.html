@@ -627,7 +627,9 @@ let USER_TG_ID = tg.initDataUnsafe?.user?.id || null;
 
 let products = [];
 let categories = [];
+let restaurants = [];
 let selectedCategoryId = 'all';
+let selectedRestaurantId = 'all';
 let searchQuery = '';
 let cart = {};
 let selectedDay  = 'today';
@@ -727,13 +729,7 @@ async function loadUserProfile() {
   } catch(e) { console.error('loadUserProfile error:', e); }
 }
 
-let products = [];
-let categories = [];
-let restaurants = [];
-let selectedCategoryId = 'all';
-let selectedRestaurantId = 'all';
-let searchQuery = '';
-let cart = {};
+
 
 async function loadProducts() {
   const splashStart = Date.now();
