@@ -2909,7 +2909,7 @@ async function uploadRestImage(input) {
   formData.append('file', file);
   showToast('Rasm yuklanmoqda...', 'info');
   try {
-    const res = await fetch('/api/upload', { method: 'POST', body: formData, headers: { 'Authorization': 'Bearer ' + API_TOKEN } });
+    const res = await fetch('/api/upload', { method: 'POST', body: formData, headers: { 'Authorization': 'Bearer ' + TOKEN } });
     const data = await res.json();
     if (data.url) {
       document.getElementById('rest-image').value = data.url;
