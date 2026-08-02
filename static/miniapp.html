@@ -611,9 +611,12 @@ tg.expand();
 // ============================================================
 function hideSplash() {
   const splash = document.getElementById('splash');
+  if (!splash) return;
   splash.classList.add('hide');
-  setTimeout(() => splash.remove(), 450);
+  setTimeout(() => { if (splash && splash.parentNode) splash.remove(); }, 450);
 }
+// Splash ekrani hech qachon qotib qolmasligi uchun maxsus kafolatli taymer
+setTimeout(hideSplash, 1500);
 
 // ============================================================
 // STATE

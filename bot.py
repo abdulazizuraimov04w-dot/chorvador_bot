@@ -1134,8 +1134,6 @@ async def api_assign_order_courier(request):
 # --- RESTAURANTS ---
 
 async def api_get_restaurants(request):
-    if not is_authorized(request):
-        return web.json_response({"error": "Ruxsat yo'q!"}, status=401)
     try:
         from database import models
         restaurants = await models.get_all_restaurants()
